@@ -17,11 +17,11 @@ WORKDIR /app
 # Copy your application code into the container
 COPY . .
 
-# Ensure bash.sh has executable permissions
-# RUN chmod +x bash.sh
+# Ensure bash.sh has executable permissions and convert line endings from Windows to Unix
+RUN chmod +x bash.sh && sed -i 's/\r$//' bash.sh
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Command to run your application (assuming bash.sh is your entry point)
-CMD gunicorn app:app & python3 -m main
+# Run the Gunicorn server (with main:app being the entry point)
+CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8000", "--workers", "3"]
