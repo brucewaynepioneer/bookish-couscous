@@ -23,5 +23,5 @@ RUN chmod +x bash.sh && sed -i 's/\r$//' bash.sh
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Run the Gunicorn server (with main:app being the entry point)
-CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# Run the Gunicorn server with logging enabled
+CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8000", "--workers", "3", "--log-level", "debug"]
