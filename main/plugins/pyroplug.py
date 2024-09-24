@@ -1,4 +1,4 @@
-# Join t.me/Dhrubo
+# godhasallthepower
 import re
 import asyncio, time, os
 import pymongo
