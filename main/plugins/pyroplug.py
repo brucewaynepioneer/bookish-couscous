@@ -1,4 +1,4 @@
-# Join t.me/devggn
+# Join t.me/Dhrubo
 import re
 import asyncio, time, os
 import pymongo
@@ -14,6 +14,7 @@ from pyrogram.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
 from telethon import events
 import logging
+
 logging.basicConfig(level=logging.debug,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -24,8 +25,8 @@ logging.getLogger("telethon").setLevel(logging.INFO)
 # OWNER_ID = 7065117445 # edit this
 # LOG_GROUP = -1001878947221 #edit this
 
-MDB = "mongodb+srv://ggn:ggn@ggn.upuljx5.mongodb.net/?retryWrites=true&w=majority&appName=ggn"
-MONGODB_CONNECTION_STRING = config("MONGODB", default=MDB)
+MDB = ""
+MONGODB_CONNECTION_STRING = config("MDB", default=MDB)
 
 # MongoDB database name and collection name
 DB_NAME = "smart_users"
@@ -59,18 +60,17 @@ SUPER_USERS = load_authorized_users()
 # Define a dictionary to store user chat IDs
 user_chat_ids = {}
 
+####################################################################
 
+#--------------------------------------------------------------------------
 async def copy_message_with_chat_id(client, sender, chat_id, message_id):
-    # Get the user's set chat ID, if available; otherwise, use the original sender ID
-    target_chat_id = user_chat_ids.get(sender, sender)
+    target_chat_id, thread_id = user_chat_ids.get(sender, (sender, None))
     
     try:
-        # Fetch the message using get_message
-        msg = await client.get_messages(chat_id, message_id)
+        msg = await client.get_messages(chat_id, message_ids=message_id)
         
-        # Modify the caption based on user's custom caption preference
         custom_caption = get_user_caption_preference(sender)
-        original_caption = msg.caption if msg.caption else ''
+        original_caption = msg.caption if msg.caption else msg.text if msg.text else ''
         final_caption = f"{original_caption}" if custom_caption else f"{original_caption}"
         
         delete_words = load_delete_words(sender)
@@ -81,66 +81,76 @@ async def copy_message_with_chat_id(client, sender, chat_id, message_id):
         for word, replace_word in replacements.items():
             final_caption = final_caption.replace(word, replace_word)
         
-        caption = f"{final_caption}\n\n__**{custom_caption}**__" if custom_caption else f"{final_caption}\n\n__**[Team SPY](https://t.me/devggn)**__"
+        caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
         
-        if msg.media:
-            if msg.media == MessageMediaType.VIDEO:
-                gagn = await client.send_video(target_chat_id, msg.video.file_id, caption=caption)
-                try:
-                  await gagn.copy(LOG_GROUP)
-                except Exception:
-                  pass
-            elif msg.media == MessageMediaType.DOCUMENT:
-                gagn = await client.send_document(target_chat_id, msg.document.file_id, caption=caption)
-                try:
-                  await gagn.copy(LOG_GROUP)
-                except Exception:
-                  pass
-            elif msg.media == MessageMediaType.PHOTO:
-                gagn = await client.send_photo(target_chat_id, msg.photo.file_id, caption=caption)
-                try:
-                  await gagn.copy(LOG_GROUP)
-                except Exception:
-                  pass
-            else:
-                # Use copy_message for any other media types
-                gagn = await client.copy_message(target_chat_id, chat_id, message_id)
-                try:
-                  await gagn.copy(LOG_GROUP)
-                except Exception:
-                  pass
+        if msg.video:
+            gagn = await client.send_video(target_chat_id, msg.video.file_id, caption=caption, reply_to_message_id=thread_id)
+        elif msg.document:
+            gagn = await client.send_document(target_chat_id, msg.document.file_id, caption=caption, reply_to_message_id=thread_id)
+        elif msg.photo:
+            gagn = await client.send_photo(target_chat_id, msg.photo.file_id, caption=caption, reply_to_message_id=thread_id)
         else:
-            # Use copy_message if there is no media
-            gagn = await client.copy_message(target_chat_id, chat_id, message_id)
-            try:
-              await gagn.copy(LOG_GROUP)
-            except Exception:
-              pass
+            gagn = await client.copy_message(target_chat_id, chat_id, message_id, reply_to_message_id=thread_id)
+
+        try:
+            await gagn.copy(LOG_GROUP)
+        except Exception:
+            pass
 
     except Exception as e:
         error_message = f"Error occurred while sending message to chat ID {target_chat_id}: {str(e)}"
         await client.send_message(sender, error_message)
         await client.send_message(sender, f"Make Bot admin in your Channel - {target_chat_id} and restart the process after /cancel")
 
+
+
+#----------------------------------------------------------------------------------------------------------------------------------------
 async def send_message_with_chat_id(client, sender, message, parse_mode=None):
-    # Get the user's set chat ID, if available; otherwise, use the original sender ID
-    chat_id = user_chat_ids.get(sender, sender)
+    chat_id, thread_id = user_chat_ids.get(sender, (sender, None))
     try:
-        gagn = await client.send_message(chat_id, message, parse_mode=parse_mode)        
+        gagn = await client.send_message(chat_id, message, parse_mode=parse_mode, reply_to_message_id=thread_id)
         try:
-          await gagn.copy(LOG_GROUP)
+            await gagn.copy(LOG_GROUP)
         except Exception:
-          pass  # Just pass silently if copying fails
-  
+            pass
     except Exception as e:
         error_message = f"Error occurred while sending message to chat ID {chat_id}: {str(e)}"
         await client.send_message(sender, error_message)
         await client.send_message(sender, f"Make Bot admin in your Channel - {chat_id} and restart the process after /cancel")
 
+#---------------------------------------------
+
+#thumb_path = screenshot(file, duration, sender)
+async def send_document_with_chat_id(client, sender, path, caption, thumb_path, upm):
+    chat_id, thread_id = user_chat_ids.get(sender, (sender, None))
+    try:
+        gagn = await client.send_document(
+            chat_id=chat_id,
+            document=path,
+            caption=caption,
+            thumb=thumb_path,
+            reply_to_message_id=thread_id,
+            progress=progress_for_pyrogram,
+            progress_args=(
+                client,
+                '**__Uploading:__**\n**__Bot made by [Dhrubo](https://t.me/dhrubodbo001)__**',
+                upm,
+                time.time()
+            )
+        )
+        try:
+            await gagn.copy(LOG_GROUP)
+        except Exception:
+            pass
+    except Exception as e:
+        error_message = f"Error occurred while sending document to chat ID {chat_id}: {str(e)}"
+        await client.send_message(sender, error_message)
+        await client.send_message(sender, f"Make Bot admin in your Channel - {chat_id} and restart the process after /cancel")
+
 #thumb_path = screenshot(file, duration, sender)
 async def send_video_with_chat_id(client, sender, path, caption, duration, hi, wi, thumb_path, upm):
-    # Get the user's set chat ID, if available; otherwise, use the original sender ID
-    chat_id = user_chat_ids.get(sender, sender)
+      # Get the user's set chat ID, if available; otherwise, use the original sender ID
+    chat_id, thread_id = user_chat_ids.get(sender, (sender, None))
     try:
         gagn = await client.send_video(
             chat_id=chat_id,
@@ -148,13 +158,14 @@ async def send_video_with_chat_id(client, sender, path, caption, duration, hi, w
             caption=caption,
             supports_streaming=True,
             duration=duration,
-            height=hi,
             width=wi,
+            height=hi,
             thumb=thumb_path,
+            reply_to_message_id=thread_id,
             progress=progress_for_pyrogram,
             progress_args=(
                 client,
-                '**__Uploading: [Team SPY](https://t.me/devggn)__**\n ',
+                '**__Uploading: [Dhrubo](https://t.me/dhrubodbo001)__**\n ',
                 upm,
                 time.time()
             )
@@ -169,34 +180,12 @@ async def send_video_with_chat_id(client, sender, path, caption, duration, hi, w
         await client.send_message(sender, f"Make Bot admin in your Channel - {chat_id} and restart the process after /cancel")
 
 
-async def send_document_with_chat_id(client, sender, path, caption, thumb_path, upm):
-    # Get the user's set chat ID, if available; otherwise, use the original sender ID
-    chat_id = user_chat_ids.get(sender, sender)
-    try:
-        gagn = await client.send_document(
-            chat_id=chat_id,
-            document=path,
-            caption=caption,
-            thumb=thumb_path,
-            progress=progress_for_pyrogram,
-            progress_args=(
-                client,
-                '**__Uploading:__**\n**__Bot made by [Team SPY](https://t.me/devggn)__**',
-                upm,
-                time.time()
-            )
-        )
-        try:
-          await gagn.copy(LOG_GROUP)
-        except Exception:
-          pass
-    except Exception as e:
-        error_message = f"Error occurred while sending document to chat ID {chat_id}: {str(e)}"
-        await client.send_message(sender, error_message)
-        await client.send_message(sender, f"Make Bot admin in your Channel - {chat_id} and restart the process after /cancel")
 
 
 
+# In-memory storage for simplicity. Replace with your persistent storage solution.
+delete_words_storage = {}
+replacement_words_storage = {}
 
 def load_delete_words(user_id):
     """
@@ -246,7 +235,6 @@ def save_replacement_words(user_id, replacements):
     except Exception as e:
         print(f"Error saving replacement words: {e}")
 
-
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -256,25 +244,46 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
     
-    # Parse the command arguments
-    match = re.match(r"/replace '(.+)' '(.+)'", event.raw_text)
-    if not match:
-        return await event.respond("Usage: /replace 'WORD(s)' 'REPLACEWORD'")
-    
-    word, replace_word = match.groups()
-    
-    # Load delete words
-    delete_words = load_delete_words(user_id)
-    if word in delete_words:
-        return await event.respond(f"The word '{word}' is in the delete set and cannot be replaced.")
-    
-    # Load replacement words
-    replacements = load_replacement_words(user_id)
-    replacements[word] = replace_word
-    save_replacement_words(user_id, replacements)
+    # Parse the command arguments for multiple word replacement
+    match = re.match(r'/replace\s+"([^"]+)"\s+"([^"]+)"\s*->\s*"([^"]+)"\s+"([^"]+)"', event.raw_text)
+    if match:
+        old1, old2, new1, new2 = match.groups()
+        
+        # Load delete words
+        delete_words = load_delete_words(user_id)
+        if old1 in delete_words or old2 in delete_words:
+            return await event.respond(f"One of the words '{old1}' or '{old2}' is in the delete set and cannot be replaced.")
+        
+        # Save the latest replacements
+        replacements = {old1: new1, old2: new2}
+        save_replacement_words(user_id, replacements)
 
-    await event.respond(f"Replacement saved: '{word}' will be replaced with '{replace_word}'")
+        return await event.respond(f"Replacements saved: '{old1}' -> '{new1}', '{old2}' -> '{new2}'")
+    
+    # Parse the command arguments for single word replacement
+    match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
+    if match:
+        old_word, new_word = match.groups()
+        
+        # Load delete words
+        delete_words = load_delete_words(user_id)
+        if old_word in delete_words:
+            return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
+        
+        # Save the latest replacement
+        replacements = {old_word: new_word}
+        save_replacement_words(user_id, replacements)
 
+        return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
+    
+    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor multiple word replacement: /replace \"WORD1\" \"WORD2\" -> \"REPLACEWORD1\" \"REPLACEWORD2\"")
+
+
+    
+
+    ##-----------------------------------------------##
+    
+    
 @bot.on(events.NewMessage(incoming=True, pattern='/auth'))
 async def _auth(event):
     """
@@ -357,8 +366,8 @@ async def set_rename_command(user_id, custom_rename_tag):
 
 # Function to get the user's custom renaming preference
 def get_user_rename_preference(user_id):
-    # Retrieve the user's custom renaming tag if set, or default to '@devggn'
-    return user_rename_preferences.get(str(user_id), '@devggn')
+    # Retrieve the user's custom renaming tag if set, or default to '@Dhrubo'
+    return user_rename_preferences.get(str(user_id), '@Dhrubo')
 
 # Function to set custom caption preference
 async def set_caption_command(user_id, custom_caption):
@@ -372,19 +381,27 @@ def get_user_caption_preference(user_id):
 
 @bot.on(events.NewMessage(incoming=True, pattern='/setchat'))
 async def set_chat_id(event):
-    # Check if the command is used by an authorized user
     user_id = event.sender_id
     if user_id not in SUPER_USERS:
         return await event.respond("This command is available to authorized users only.")
     
-    # Extract chat ID from the message
     try:
-        chat_id = int(event.raw_text.split(" ", 1)[1])
-        # Store user's chat ID
-        user_chat_ids[event.sender_id] = chat_id
-        await event.reply("Chat ID set successfully!")
+        parts = event.raw_text.split(" ", 1)
+        if len(parts) < 2:
+            return await event.reply("Please provide the chat ID after the command.")
+        
+        chat_id, thread_id = map(int, parts[1].split())
+        user_chat_ids[user_id] = (chat_id, thread_id)
+        await event.reply("Chat ID and Thread ID set successfully!")
     except ValueError:
-        await event.reply("Invalid chat ID!")
+        await event.reply("Invalid chat ID or thread ID!")
+    except Exception as e:
+        await event.reply(f"An error occurred: {e}")
+
+        
+        
+
+        
 
 @bot.on(events.NewMessage(incoming=True, pattern='/setrename'))
 async def set_rename_command_handler(event):
@@ -643,21 +660,16 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Unrestricting__: __[Team SPY](https://t.me/devggn)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Unrestricting__: __[Team SPY](https://t.me/devggn)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@devggn' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@Dhrubo' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
             if last_dot_index != -1 and last_dot_index != 0:
-              ggn_ext = str(file)[last_dot_index + 1:]
-              if ggn_ext.isalpha() and len(potential_extension) <= 4:
-                original_file_name = str(file)[:last_dot_index]
-                file_extension = str(file)[last_dot_index + 1:]
-              else:
-                original_file_name = str(file)
-                file_extension = 'mp4'
+              original_file_name = str(file)[:last_dot_index]
+              file_extension = str(file)[last_dot_index + 1:]
             else:
               original_file_name = str(file)
               file_extension = 'mp4'
@@ -712,7 +724,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
                   final_caption = final_caption.replace(word, replace_word)  
                 # final_caption = re.sub(r'\s{2,}', '  ', final_caption.strip())
                 # final_caption = re.sub(r'\n{2,}', '\n\n', final_caption)
-                caption = f"{final_caption}\n\n__**{custom_caption}**__" if custom_caption else f"{final_caption}\n\n__**[Team SPY](https://t.me/devggn)**__"
+                caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
                 await send_video_with_chat_id(client, sender, path, caption, duration, hi, wi, thumb_path, upm)
             elif str(file).split(".")[-1] in ['jpg', 'jpeg', 'png', 'webp']:
                 if file_n != '':
@@ -746,7 +758,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
                   final_caption = final_caption.replace(word, replace_word)  
                 # final_caption = re.sub(r'\s{2,}', '  ', final_caption.strip())
                 # final_caption = re.sub(r'\n{2,}', '\n\n', final_caption)
-                caption = f"{final_caption}\n\n__**{custom_caption}**__" if custom_caption else f"{final_caption}\n\n__**[Team SPY](https://t.me/devggn)**__"
+                caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
                 await send_document_with_chat_id(client, sender, path, caption, thumb_path, upm)
                     
             os.remove(file)
@@ -843,7 +855,7 @@ async def x(userbot, client, sender, edit_id, msg_link, i, file_n):
                 progress=progress_for_pyrogram,
                 progress_args=(
                     client,
-                    "**__Unrestricting__: __[Team SPY](https://t.me/dev_gagan)__**\n ",
+                    "**__Downloading__: __[Team SPY](https://t.me/dev_gagan)__**\n ",
                     edit,
                     time.time()
                 )
@@ -884,7 +896,7 @@ async def x(userbot, client, sender, edit_id, msg_link, i, file_n):
                     logging.info(e)
                     thumb_path = None
                 
-                caption = f"{msg.caption}\n\n__Unrestricted by **[Team SPY](https://t.me/dev_gagan)**__" if msg.caption else "__Unrestricted by **[Team SPY](https://t.me/dev_gagan)**__"
+                caption = f"{msg.caption}\n\n__Downloadedd by **[Team SPY](https://t.me/dev_gagan)**__" if msg.caption else "__Downloadedd by **[Team SPY](https://t.me/dev_gagan)**__"
                 await send_video_with_chat_id(client, sender, path, caption, duration, hi, wi, thumb_path, upm)
             elif str(file).split(".")[-1] in ['jpg', 'jpeg', 'png', 'webp']:
                 if file_n != '':
@@ -898,7 +910,7 @@ async def x(userbot, client, sender, edit_id, msg_link, i, file_n):
                     file = path
 
                 
-                caption = f"{msg.caption}\n\n__Unrestricted by **[Team SPY](https://t.me/dev_gagan)**__" if msg.caption else "__Unrestricted by **[Team SPY](https://t.me/dev_gagan)**__"
+                caption = f"{msg.caption}\n\n__Downloadedd by **[Team SPY](https://t.me/dev_gagan)**__" if msg.caption else "__Downloadedd by **[Team SPY](https://t.me/dev_gagan)**__"
                 await upm.edit("__Uploading photo...__")
 
                 await bot.send_file(sender, path, caption=caption)
@@ -914,7 +926,7 @@ async def x(userbot, client, sender, edit_id, msg_link, i, file_n):
                     file = path
                 thumb_path = await screenshot(file, duration, sender)
                 
-                caption = f"{msg.caption}\n\n__Unrestricted by **[Team SPY](https://t.me/dev_gagan)**__" if msg.caption else "__Unrestricted by **[Team SPY](https://t.me/dev_gagan)**__"
+                caption = f"{msg.caption}\n\n__Downloadedd by **[Team SPY](https://t.me/dev_gagan)**__" if msg.caption else "__Downloadedd by **[Team SPY](https://t.me/dev_gagan)**__"
                 await send_document_with_chat_id(client, sender, path, caption, thumb_path, upm)
             os.remove(file)
             await upm.delete()
@@ -1006,10 +1018,10 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Unrestricting__: __[Team SPY](https://t.me/devggn)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Unrestricting__: __[Team SPY](https://t.me/devggn)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@devggn' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@Dhrubo' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
@@ -1070,7 +1082,7 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
                   final_caption = final_caption.replace(word, replace_word)  
                 # final_caption = re.sub(r'\s{2,}', '  ', final_caption.strip())
                 # final_caption = re.sub(r'\n{2,}', '\n\n', final_caption)
-                caption = f"{final_caption}\n\n__**{custom_caption}**__" if custom_caption else f"{final_caption}\n\n__**[Team SPY](https://t.me/devggn)**__"
+                caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
                 await send_video_with_chat_id(client, sender, path, caption, duration, hi, wi, thumb_path, upm)
             elif str(file).split(".")[-1] in ['jpg', 'jpeg', 'png', 'webp']:
                 if file_n != '':
@@ -1104,7 +1116,7 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
                   final_caption = final_caption.replace(word, replace_word)  
                 # final_caption = re.sub(r'\s{2,}', '  ', final_caption.strip())
                 # final_caption = re.sub(r'\n{2,}', '\n\n', final_caption)
-                caption = f"{final_caption}\n\n__**{custom_caption}**__" if custom_caption else f"{final_caption}\n\n__**[Team SPY](https://t.me/devggn)**__"
+                caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
                 await send_document_with_chat_id(client, sender, path, caption, thumb_path, upm)
                     
             os.remove(file)
