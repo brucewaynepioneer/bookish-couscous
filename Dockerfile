@@ -18,10 +18,10 @@ WORKDIR /app
 COPY . .
 
 # Ensure bash.sh has executable permissions
-RUN chmod +x bash.sh
+# RUN chmod +x bash.sh
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Command to run your application (assuming bash.sh is your entry point)
-CMD ["bash", "bash.sh"]
+CMD flask run -h 0.0.0.0 -p 8000 & python3 -m main
