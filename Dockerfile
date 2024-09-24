@@ -24,4 +24,4 @@ COPY . .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Command to run your application (assuming bash.sh is your entry point)
-CMD flask run -h 0.0.0.0 -p 8000 & python3 -m main
+CMD gunicorn app:app & python3 main.py
