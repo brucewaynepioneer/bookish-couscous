@@ -24,4 +24,4 @@ COPY . .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Command to run your application (assuming bash.sh is your entry point)
-CMD gunicorn app:app & python3 -m main.py
+CMD gunicorn app:app & python3 -m main
