@@ -1,10 +1,10 @@
-#godhasallthepower
+#uwill
 import re
 import asyncio, time, os
 import pymongo
 from decouple import config
 from pyrogram.enums import ParseMode, MessageMediaType
-from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB
+from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB  # Import from __init__.py
 from main.plugins.progress import progress_for_pyrogram
 from main.plugins.helpers import screenshot
 from pyrogram import Client, filters
@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 logging.getLogger("pyrogram").setLevel(logging.INFO)
 logging.getLogger("telethon").setLevel(logging.INFO)
 
-# Fetch MongoDB connection string from environment variable
-MONGODB_CONNECTION_STRING = config("MONGODB_CONNECTION_STRING", default="None")
-
 # MongoDB database name and collection name
 DB_NAME = "smart_users"
 COLLECTION_NAME = "super_user"
 
-# Establish a connection to MongoDB
+# Use the MongoDB connection string (MONGODB) from __init__.py
+MONGODB_CONNECTION_STRING = MONGODB
+
+# Establish a connection to MongoDB using the connection string from __init__.py
 mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 db = mongo_client[DB_NAME]
 collection = db[COLLECTION_NAME]
