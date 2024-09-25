@@ -20,7 +20,7 @@ logging.getLogger("telethon").setLevel(logging.WARNING)
 uvloop.install()
 
 # Load sensitive variables from the .env file
-MONGODB = config("MONGODB_CONNECTION_STRING", default="mongodb://localhost:27017")
+MONGODB = config("MONGODB_CONNECTION_STRING", default="None")
 API_ID = config("API_ID", cast=int)  # Ensure API_ID is cast to an integer
 API_HASH = config("API_HASH")
 BOT_TOKEN = config("BOT_TOKEN")
