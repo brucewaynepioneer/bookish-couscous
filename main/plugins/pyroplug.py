@@ -265,7 +265,7 @@ async def process_replacement(event, user_id):
         replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
-        return await event.respond(f"Replacements saved: {', '.join([f'\"{old}\" -> \"{new}\"' for old, new in replacements.items()])}")
+        return await event.respond(f"Replacements saved: {', '.join([f'\"{old}\" -> \"{new}\"' for old, new in replacements.items()]).replace('\"', '\"')}")
 
     # Parse the command arguments for single word replacement
     match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
