@@ -26,7 +26,8 @@ DB_NAME = "smart_users"
 COLLECTION_NAME = "super_user"
 
 # Use the MongoDB connection string (MONGODB) from __init__.py
-MONGODB_CONNECTION_STRING = MONGODB
+# MONGODB_CONNECTION_STRING = MONGODB
+MONGODB_CONNECTION_STRING = config("MONGODB")
 
 # Establish a connection to MongoDB using the connection string from __init__.py
 mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
