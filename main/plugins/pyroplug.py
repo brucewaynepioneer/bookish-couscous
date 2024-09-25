@@ -241,39 +241,39 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
     
-    # Parse the command arguments for multiple word replacement
-    match = re.match(r'/replace\s+"([^"]+)"\s+"([^"]+)"\s*->\s*"([^"]+)"\s+"([^"]+)"', event.raw_text)
+
+# Function to process replacement command for n words
+async def process_replacement(event, user_id):
+    # Regex to capture an arbitrary number of word pairs for replacement
+    match = re.match(r'/replace\s+((?:"[^"]+"\s*)+)->\s+((?:"[^"]+"\s*)+)', event.raw_text)
+    
     if match:
-        old1, old2, new1, new2 = match.groups()
-        
+        old_words_str, new_words_str = match.groups()
+
+        # Extract words from the matched groups
+        old_words = re.findall(r'"([^"]+)"', old_words_str)
+        new_words = re.findall(r'"([^"]+)"', new_words_str)
+
+        # Check if the number of old and new words are the same
+        if len(old_words) != len(new_words):
+            return await event.respond("The number of words to be replaced must match the number of replacement words.")
+
         # Load delete words
         delete_words = load_delete_words(user_id)
-        if old1 in delete_words or old2 in delete_words:
-            return await event.respond(f"One of the words '{old1}' or '{old2}' is in the delete set and cannot be replaced.")
-        
-        # Save the latest replacements
-        replacements = {old1: new1, old2: new2}
+        for old_word in old_words:
+            if old_word in delete_words:
+                return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
+
+        # Save the latest replacements as a dictionary
+        replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
-        return await event.respond(f"Replacements saved: '{old1}' -> '{new1}', '{old2}' -> '{new2}'")
+        # Prepare response message
+        replacement_str = ', '.join([f'"{old}" -> "{new}"' for old, new in replacements.items()])
+        return await event.respond(f"Replacements saved: {replacement_str}")
     
-    # Parse the command arguments for single word replacement
-    match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
-    if match:
-        old_word, new_word = match.groups()
-        
-        # Load delete words
-        delete_words = load_delete_words(user_id)
-        if old_word in delete_words:
-            return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
-        
-        # Save the latest replacement
-        replacements = {old_word: new_word}
-        save_replacement_words(user_id, replacements)
+    return await event.respond("Usage: /replace \"WORD1\" \"WORD2\" ... -> \"REPLACEWORD1\" \"REPLACEWORD2\" ...")
 
-        return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
-    
-    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor multiple word replacement: /replace \"WORD1\" \"WORD2\" -> \"REPLACEWORD1\" \"REPLACEWORD2\"")
 
 
     
