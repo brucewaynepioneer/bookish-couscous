@@ -246,16 +246,16 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Regex for replacing 1 to 6 words: /replace "OLD1" "OLD2" ... -> "NEW1" "NEW2" ...
+    # Regex for replacing 1 to 6 words/phrases: /replace "OLD1" "OLD2" ... -> "NEW1" "NEW2" ...
     match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*){1,6})\s*->\s*((?:\"[^\"]+\"\s*){1,6})', event.raw_text)
     if match:
-        # Get old and new word lists by splitting the captured groups
-        old_words = [w.strip('"') for w in match.group(1).split()]
-        new_words = [w.strip('"') for w in match.group(2).split()]
+        # Get old and new word lists by splitting the captured groups while keeping quoted phrases intact
+        old_words = re.findall(r'"([^"]+)"', match.group(1))  # Extract old words/phrases
+        new_words = re.findall(r'"([^"]+)"', match.group(2))  # Extract new words/phrases
 
         # Ensure the number of old and new words are the same
         if len(old_words) != len(new_words):
-            return await event.respond("The number of words to replace must match the number of new words.")
+            return await event.respond("The number of words/phrases to replace must match the number of new words/phrases.")
 
         # Load delete words
         delete_words = load_delete_words(user_id)
@@ -265,7 +265,7 @@ async def replace_command(event):
             return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
         # Save the latest replacements
-        replacements = dict(zip(old_words, new_words))  # Create a mapping of old -> new words
+        replacements = dict(zip(old_words, new_words))  # Create a mapping of old -> new words/phrases
         save_replacement_words(user_id, replacements)
 
         # Build a response showing all replacements
@@ -291,18 +291,22 @@ async def replace_command(event):
     if match:
         old_word, format_type = match.groups()
 
+        # Define format styles and their corresponding symbols
         format_map = {
-            "bold": "**",   # Bold -> **TEXT**
+            "bold": "**",  # Bold -> **TEXT**
             "italic": "*",  # Italic -> *TEXT*
             "underline": "__",  # Underline -> __TEXT__
             "backticks": "`"  # Backticks -> `TEXT`
         }
 
+        # Check if the format type is valid
         if format_type not in format_map:
             return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
 
+        # Apply the format using the appropriate symbols
         formatted_word = f'{format_map[format_type]}{old_word}{format_map[format_type]}'
 
+        # Save the formatted word replacement
         replacements = {old_word: formatted_word}
         save_replacement_words(user_id, replacements)
 
