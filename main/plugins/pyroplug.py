@@ -235,6 +235,7 @@ def save_replacement_words(user_id, replacements):
 
 
 
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -249,12 +250,10 @@ async def replace_command(event):
     if match:
         old1, old2, old3, old4, old5, old6, new1, new2, new3, new4, new5, new6 = match.groups()
         
-        # Load delete words
         delete_words = load_delete_words(user_id)
         if any(old_word in delete_words for old_word in [old1, old2, old3, old4, old5, old6]):
             return await event.respond(f"One or more words in the old words list are in the delete set and cannot be replaced.")
         
-        # Save the latest replacements
         replacements = {old1: new1, old2: new2, old3: new3, old4: new4, old5: new5, old6: new6}
         save_replacement_words(user_id, replacements)
 
@@ -274,22 +273,33 @@ async def replace_command(event):
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
     
-    # Regex for format change: /replace format "TEXT" -> "`TEXT`" (adding backticks)
-    match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*"`([^"]+)`"', event.raw_text)
+    # Regex for formatting commands: /replace format "TEXT" -> "FORMAT_TYPE"
+    match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
     if match:
-        old_word, formatted_word = match.groups()
+        old_word, format_type = match.groups()
 
-        delete_words = load_delete_words(user_id)
-        if old_word in delete_words:
-            return await event.respond(f"The word '{old_word}' is in the delete set and cannot be formatted.")
-        
+        # Define format styles and their corresponding symbols
+        format_map = {
+            "bold": "**",  # Bold -> **TEXT**
+            "italic": "*",  # Italic -> *TEXT*
+            "underline": "__",  # Underline -> __TEXT__
+            "backticks": "`"  # Backticks -> `TEXT`
+        }
+
+        # Check if the format type is valid
+        if format_type not in format_map:
+            return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
+
+        # Apply the format using the appropriate symbols
+        formatted_word = f'{format_map[format_type]}{old_word}{format_map[format_type]}'
+
         # Save the formatted word replacement
-        replacements = {old_word: f'`{old_word}`'}
+        replacements = {old_word: formatted_word}
         save_replacement_words(user_id, replacements)
 
-        return await event.respond(f"Text formatted: '{old_word}' will now be displayed as `{old_word}`")
+        return await event.respond(f"Text formatted: '{old_word}' will now be displayed as {formatted_word}")
     
-    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor up to 6 word replacements: /replace \"WORD1\" \"WORD2\" \"WORD3\" \"WORD4\" \"WORD5\" \"WORD6\" -> \"REPLACEWORD1\" \"REPLACEWORD2\" \"REPLACEWORD3\" \"REPLACEWORD4\" \"REPLACEWORD5\" \"REPLACEWORD6\"\nTo format text: /replace format \"WORD\" -> \"`WORD`\"")
+    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor up to 6 word replacements: /replace \"WORD1\" \"WORD2\" \"WORD3\" \"WORD4\" \"WORD5\" \"WORD6\" -> \"REPLACEWORD1\" \"REPLACEWORD2\" \"REPLACEWORD3\" \"REPLACEWORD4\" \"REPLACEWORD5\" \"REPLACEWORD6\"\nTo format text: /replace format \"WORD\" -> FORMAT_TYPE\nValid format types: bold, italic, underline, backticks")
 
     
 
