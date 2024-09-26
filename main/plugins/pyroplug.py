@@ -236,6 +236,7 @@ def save_replacement_words(user_id, replacements):
 
 
 
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -244,26 +245,38 @@ async def replace_command(event):
     user_id = event.sender_id
     if not user_id:
         return await event.respond("User ID not found!")
-    
-    # Regex for up to 6 word replacements: /replace "OLD1" "OLD2" "OLD3" "OLD4" "OLD5" "OLD6" -> "NEW1" "NEW2" "NEW3" "NEW4" "NEW5" "NEW6"
-    match = re.match(r'/replace\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s*->\s*"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"', event.raw_text)
+
+    # Regex for replacing 1 to 6 words: /replace "OLD1" "OLD2" ... -> "NEW1" "NEW2" ...
+    match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*){1,6})\s*->\s*((?:\"[^\"]+\"\s*){1,6})', event.raw_text)
     if match:
-        old1, old2, old3, old4, old5, old6, new1, new2, new3, new4, new5, new6 = match.groups()
-        
+        # Get old and new word lists by splitting the captured groups
+        old_words = [w.strip('"') for w in match.group(1).split()]
+        new_words = [w.strip('"') for w in match.group(2).split()]
+
+        # Ensure the number of old and new words are the same
+        if len(old_words) != len(new_words):
+            return await event.respond("The number of words to replace must match the number of new words.")
+
+        # Load delete words
         delete_words = load_delete_words(user_id)
-        if any(old_word in delete_words for old_word in [old1, old2, old3, old4, old5, old6]):
-            return await event.respond(f"One or more words in the old words list are in the delete set and cannot be replaced.")
         
-        replacements = {old1: new1, old2: new2, old3: new3, old4: new4, old5: new5, old6: new6}
+        # Check if any old words are in the delete set
+        if any(old_word in delete_words for old_word in old_words):
+            return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
+
+        # Save the latest replacements
+        replacements = dict(zip(old_words, new_words))  # Create a mapping of old -> new words
         save_replacement_words(user_id, replacements)
 
-        return await event.respond(f"Replacements saved: '{old1}' -> '{new1}', '{old2}' -> '{new2}', '{old3}' -> '{new3}', '{old4}' -> '{new4}', '{old5}' -> '{new5}', '{old6}' -> '{new6}'")
+        # Build a response showing all replacements
+        replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
+        return await event.respond(f"Replacements saved: {replacement_summary}")
     
     # Regex for single word replacement: /replace "WORD" -> "REPLACEWORD"
     match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
     if match:
         old_word, new_word = match.groups()
-        
+
         delete_words = load_delete_words(user_id)
         if old_word in delete_words:
             return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
@@ -272,34 +285,30 @@ async def replace_command(event):
         save_replacement_words(user_id, replacements)
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
-    
+
     # Regex for formatting commands: /replace format "TEXT" -> "FORMAT_TYPE"
     match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
     if match:
         old_word, format_type = match.groups()
 
-        # Define format styles and their corresponding symbols
         format_map = {
-            "bold": "**",  # Bold -> **TEXT**
+            "bold": "**",   # Bold -> **TEXT**
             "italic": "*",  # Italic -> *TEXT*
             "underline": "__",  # Underline -> __TEXT__
             "backticks": "`"  # Backticks -> `TEXT`
         }
 
-        # Check if the format type is valid
         if format_type not in format_map:
             return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
 
-        # Apply the format using the appropriate symbols
         formatted_word = f'{format_map[format_type]}{old_word}{format_map[format_type]}'
 
-        # Save the formatted word replacement
         replacements = {old_word: formatted_word}
         save_replacement_words(user_id, replacements)
 
         return await event.respond(f"Text formatted: '{old_word}' will now be displayed as {formatted_word}")
     
-    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor up to 6 word replacements: /replace \"WORD1\" \"WORD2\" \"WORD3\" \"WORD4\" \"WORD5\" \"WORD6\" -> \"REPLACEWORD1\" \"REPLACEWORD2\" \"REPLACEWORD3\" \"REPLACEWORD4\" \"REPLACEWORD5\" \"REPLACEWORD6\"\nTo format text: /replace format \"WORD\" -> FORMAT_TYPE\nValid format types: bold, italic, underline, backticks")
+    return await event.respond("Usage:\nFor word replacement: /replace \"WORD1\" \"WORD2\" ... -> \"NEW1\" \"NEW2\" ...\nFor text formatting: /replace format \"WORD\" -> FORMAT_TYPE\nValid format types: bold, italic, underline, backticks")
 
     
 
