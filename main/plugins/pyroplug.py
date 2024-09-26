@@ -234,6 +234,7 @@ def save_replacement_words(user_id, replacements):
         print(f"Error saving replacement words: {e}")
 
 
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -246,13 +247,10 @@ async def replace_command(event):
     # Regex for up to 6 word replacements: /replace "OLD1" "OLD2" "OLD3" "OLD4" "OLD5" "OLD6" -> "NEW1" "NEW2" "NEW3" "NEW4" "NEW5" "NEW6"
     match = re.match(r'/replace\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s*->\s*"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"', event.raw_text)
     if match:
-        # Extract the 6 old words and 6 new words
         old1, old2, old3, old4, old5, old6, new1, new2, new3, new4, new5, new6 = match.groups()
         
         # Load delete words
         delete_words = load_delete_words(user_id)
-        
-        # Check if any old words are in the delete set
         if any(old_word in delete_words for old_word in [old1, old2, old3, old4, old5, old6]):
             return await event.respond(f"One or more words in the old words list are in the delete set and cannot be replaced.")
         
@@ -267,18 +265,31 @@ async def replace_command(event):
     if match:
         old_word, new_word = match.groups()
         
-        # Load delete words
         delete_words = load_delete_words(user_id)
         if old_word in delete_words:
             return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
         
-        # Save the latest replacement
         replacements = {old_word: new_word}
         save_replacement_words(user_id, replacements)
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
     
-    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor up to 6 word replacements: /replace \"WORD1\" \"WORD2\" \"WORD3\" \"WORD4\" \"WORD5\" \"WORD6\" -> \"REPLACEWORD1\" \"REPLACEWORD2\" \"REPLACEWORD3\" \"REPLACEWORD4\" \"REPLACEWORD5\" \"REPLACEWORD6\"")
+    # Regex for format change: /replace format "TEXT" -> "`TEXT`" (adding backticks)
+    match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*"`([^"]+)`"', event.raw_text)
+    if match:
+        old_word, formatted_word = match.groups()
+
+        delete_words = load_delete_words(user_id)
+        if old_word in delete_words:
+            return await event.respond(f"The word '{old_word}' is in the delete set and cannot be formatted.")
+        
+        # Save the formatted word replacement
+        replacements = {old_word: f'`{old_word}`'}
+        save_replacement_words(user_id, replacements)
+
+        return await event.respond(f"Text formatted: '{old_word}' will now be displayed as `{old_word}`")
+    
+    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor up to 6 word replacements: /replace \"WORD1\" \"WORD2\" \"WORD3\" \"WORD4\" \"WORD5\" \"WORD6\" -> \"REPLACEWORD1\" \"REPLACEWORD2\" \"REPLACEWORD3\" \"REPLACEWORD4\" \"REPLACEWORD5\" \"REPLACEWORD6\"\nTo format text: /replace format \"WORD\" -> \"`WORD`\"")
 
     
 
