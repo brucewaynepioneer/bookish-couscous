@@ -233,6 +233,7 @@ def save_replacement_words(user_id, replacements):
     except Exception as e:
         print(f"Error saving replacement words: {e}")
 
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -241,26 +242,27 @@ async def replace_command(event):
     user_id = event.sender_id
     if not user_id:
         return await event.respond("User ID not found!")
-
-
     
-    # Parse the command arguments for multiple word replacement
-    match = re.match(r'/replace\s+"([^"]+)"\s+"([^"]+)"\s*->\s*"([^"]+)"\s+"([^"]+)"', event.raw_text)
+    # Regex for up to 6 word replacements: /replace "OLD1" "OLD2" "OLD3" "OLD4" "OLD5" "OLD6" -> "NEW1" "NEW2" "NEW3" "NEW4" "NEW5" "NEW6"
+    match = re.match(r'/replace\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s*->\s*"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"\s+"([^"]+)"', event.raw_text)
     if match:
-        old1, old2, new1, new2 = match.groups()
+        # Extract the 6 old words and 6 new words
+        old1, old2, old3, old4, old5, old6, new1, new2, new3, new4, new5, new6 = match.groups()
         
         # Load delete words
         delete_words = load_delete_words(user_id)
-        if old1 in delete_words or old2 in delete_words:
-            return await event.respond(f"One of the words '{old1}' or '{old2}' is in the delete set and cannot be replaced.")
+        
+        # Check if any old words are in the delete set
+        if any(old_word in delete_words for old_word in [old1, old2, old3, old4, old5, old6]):
+            return await event.respond(f"One or more words in the old words list are in the delete set and cannot be replaced.")
         
         # Save the latest replacements
-        replacements = {old1: new1, old2: new2}
+        replacements = {old1: new1, old2: new2, old3: new3, old4: new4, old5: new5, old6: new6}
         save_replacement_words(user_id, replacements)
 
-        return await event.respond(f"Replacements saved: '{old1}' -> '{new1}', '{old2}' -> '{new2}'")
+        return await event.respond(f"Replacements saved: '{old1}' -> '{new1}', '{old2}' -> '{new2}', '{old3}' -> '{new3}', '{old4}' -> '{new4}', '{old5}' -> '{new5}', '{old6}' -> '{new6}'")
     
-    # Parse the command arguments for single word replacement
+    # Regex for single word replacement: /replace "WORD" -> "REPLACEWORD"
     match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
     if match:
         old_word, new_word = match.groups()
@@ -276,7 +278,7 @@ async def replace_command(event):
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
     
-    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor multiple word replacement: /replace \"WORD1\" \"WORD2\" -> \"REPLACEWORD1\" \"REPLACEWORD2\"")
+    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor up to 6 word replacements: /replace \"WORD1\" \"WORD2\" \"WORD3\" \"WORD4\" \"WORD5\" \"WORD6\" -> \"REPLACEWORD1\" \"REPLACEWORD2\" \"REPLACEWORD3\" \"REPLACEWORD4\" \"REPLACEWORD5\" \"REPLACEWORD6\"")
 
     
 
