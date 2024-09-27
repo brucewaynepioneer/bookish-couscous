@@ -3,6 +3,7 @@
 import re
 import asyncio, time, os
 import pymongo
+from pymongo import MongoClient
 from decouple import config
 from pyrogram.enums import ParseMode, MessageMediaType
 from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB  # Import from __init__.py
@@ -234,9 +235,7 @@ def save_replacement_words(user_id, replacements):
         print(f"Error saving replacement words: {e}")
 
 
-from pymongo import MongoClient
-import re
-from telethon import events
+
 
 # MongoDB Setup
 client = MongoClient(MONGODB_CONNECTION_STRING)  # Adjust this URI if using a different host or authentication
@@ -274,7 +273,21 @@ def get_replacement_words(user_id):
 def delete_all_replacements(user_id):
     replacements_collection.delete_one({'user_id': user_id})
 
-# Telegram bot command to replace words
+# Function to apply formatting to a string based on the format type
+def apply_format(text, format_type):
+    format_map = {
+        "bold": "**",
+        "italic": "*",
+        "underline": "__",
+        "backticks": "`"
+    }
+    
+    if format_type not in format_map:
+        return None  # Invalid format type
+    
+    return f'{format_map[format_type]}{text}{format_map[format_type]}'
+
+# Telegram bot command to replace words and apply formatting
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -284,7 +297,9 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Regex for replacing 1 to 6 words/phrases: /replace "OLD1" "OLD2" ... -> "NEW1" "NEW2" ...
+    response_text = ""
+
+    # Try replacing words first
     match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*){1,6})\s*->\s*((?:\"[^\"]+\"\s*){1,6})', event.raw_text)
     if match:
         old_words = re.findall(r'"([^"]+)"', match.group(1))
@@ -297,49 +312,50 @@ async def replace_command(event):
         if any(old_word in delete_words for old_word in old_words):
             return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
+        # Perform the word replacements
         replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
+        # Create a summary of replacements
         replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
-        return await event.respond(f"Replacements saved: {replacement_summary}")
-    
-    # Regex for single word replacement: /replace "WORD" -> "REPLACEWORD"
-    match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
-    if match:
+        response_text = f"Replacements saved: {replacement_summary}\n"
+
+    # Handle single word replacement if no bulk replacement
+    elif re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text):
+        match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
         old_word, new_word = match.groups()
 
         delete_words = load_delete_words(user_id)
         if old_word in delete_words:
             return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
 
+        # Perform the replacement for a single word
         replacements = {old_word: new_word}
         save_replacement_words(user_id, replacements)
+        response_text = f"Replacement saved: '{old_word}' will be replaced with '{new_word}'\n"
 
-        return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
+    else:
+        # If no replacements were provided
+        return await event.respond("Usage:\nFor word replacement: /replace \"WORD1\" \"WORD2\" ... -> \"NEW1\" \"NEW2\" ...")
 
-    # Regex for formatting commands: /replace format "TEXT" -> "FORMAT_TYPE"
-    match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
-    if match:
-        old_word, format_type = match.groups()
+    # After replacements, apply formatting if specified
+    format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
+    if format_match:
+        old_word, format_type = format_match.groups()
 
-        format_map = {
-            "bold": "**",
-            "italic": "*",
-            "underline": "__",
-            "backticks": "`"
-        }
+        if old_word in replacements:
+            formatted_word = apply_format(replacements[old_word], format_type)
+            if not formatted_word:
+                return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
 
-        if format_type not in format_map:
-            return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
+            # Save the formatted word replacement
+            replacements[old_word] = formatted_word
+            save_replacement_words(user_id, replacements)
+            response_text += f"Word '{old_word}' replaced and formatted as: {formatted_word}"
+        else:
+            return await event.respond(f"The word '{old_word}' was not found among replacements. Please replace the word first.")
 
-        formatted_word = f'{format_map[format_type]}{old_word}{format_map[format_type]}'
-        replacements = {old_word: formatted_word}
-        save_replacement_words(user_id, replacements)
-
-        return await event.respond(f"Text formatted: '{old_word}' will now be displayed as {formatted_word}")
-    
-    return await event.respond("Usage:\nFor word replacement: /replace \"WORD1\" \"WORD2\" ... -> \"NEW1\" \"NEW2\" ...\nFor text formatting: /replace format \"WORD\" -> FORMAT_TYPE\nValid format types: bold, italic, underline, backticks")
-
+    return await event.respond(response_text)
 
 # Command to show all saved replacements for a user
 @bot.on(events.NewMessage(incoming=True, pattern='/showreplacements'))
@@ -366,6 +382,8 @@ async def delete_all_replacements_command(event):
     # Delete all replacement data
     delete_all_replacements(user_id)
     return await event.respond("All your saved replacements have been deleted.")
+
+
 
 
 
