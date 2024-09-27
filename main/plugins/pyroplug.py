@@ -131,7 +131,7 @@ async def send_document_with_chat_id(client, sender, path, caption, thumb_path, 
             progress=progress_for_pyrogram,
             progress_args=(
                 client,
-                '**__Uploading:__**\n**__Bot made by [Dhrubo](https://t.me/dhrubodbo001)__**',
+                '**__Uploading:__**\n**__Bot made by [kingofpatal](https://t.me/kingofpatal)__**',
                 upm,
                 time.time()
             )
@@ -163,7 +163,7 @@ async def send_video_with_chat_id(client, sender, path, caption, duration, hi, w
             progress=progress_for_pyrogram,
             progress_args=(
                 client,
-                '**__Uploading: [Dhrubo](https://t.me/dhrubodbo001)__**\n ',
+                '**__Uploading: [kingofpatal](https://t.me/kingofpatal)__**\n ',
                 upm,
                 time.time()
             )
@@ -401,8 +401,8 @@ async def set_rename_command(user_id, custom_rename_tag):
 
 # Function to get the user's custom renaming preference
 def get_user_rename_preference(user_id):
-    # Retrieve the user's custom renaming tag if set, or default to '@Dhrubo'
-    return user_rename_preferences.get(str(user_id), '@Dhrubo')
+    # Retrieve the user's custom renaming tag if set, or default to '@kingofpatal'
+    return user_rename_preferences.get(str(user_id), '@kingofpatal')
 
 # Function to set custom caption preference
 async def set_caption_command(user_id, custom_caption):
@@ -695,10 +695,10 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@Dhrubo' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
@@ -1053,10 +1053,10 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[Dhrubo](https://t.me/dhrubodbo001)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@Dhrubo' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
