@@ -237,8 +237,9 @@ def save_replacement_words(user_id, replacements):
 
 
 
+
 # MongoDB Setup
-client = MongoClient(MONGODB_CONNECTION_STRING)  # Adjust this URI if using a different host or authentication
+client = MongoClient('mongodb://localhost:27017/')  # Adjust this URI if using a different host or authentication
 db = client['replace_word_db']  # Database
 replacements_collection = db['replacements']  # Collection for replacements
 delete_words_collection = db['delete_words']  # Collection for delete words
@@ -299,7 +300,7 @@ async def replace_command(event):
 
     response_text = ""
 
-    # Try replacing words first
+    # Regex for replacing 1 to 6 words/phrases: /replace "WORD1" "WORD2" ... -> "NEW1" "NEW2" ...
     match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*){1,6})\s*->\s*((?:\"[^\"]+\"\s*){1,6})', event.raw_text)
     if match:
         old_words = re.findall(r'"([^"]+)"', match.group(1))
@@ -334,27 +335,42 @@ async def replace_command(event):
         save_replacement_words(user_id, replacements)
         response_text = f"Replacement saved: '{old_word}' will be replaced with '{new_word}'\n"
 
-    else:
-        # If no replacements were provided
-        return await event.respond("Usage:\nFor word replacement: /replace \"WORD1\" \"WORD2\" ... -> \"NEW1\" \"NEW2\" ...")
+    # Regex for formatting commands: /replace format "TEXT" -> "FORMAT_TYPE"
+    match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
+    if match:
+        old_word, format_type = match.groups()
 
-    # After replacements, apply formatting if specified
-    format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
-    if format_match:
-        old_word, format_type = format_match.groups()
+        # Apply the format using the appropriate symbols
+        formatted_word = apply_format(old_word, format_type)
+        if not formatted_word:
+            return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
 
-        if old_word in replacements:
-            formatted_word = apply_format(replacements[old_word], format_type)
-            if not formatted_word:
-                return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
+        # Save the formatted word replacement
+        replacements = {old_word: formatted_word}
+        save_replacement_words(user_id, replacements)
 
-            # Save the formatted word replacement
-            replacements[old_word] = formatted_word
-            save_replacement_words(user_id, replacements)
-            response_text += f"Word '{old_word}' replaced and formatted as: {formatted_word}"
-        else:
-            return await event.respond(f"The word '{old_word}' was not found among replacements. Please replace the word first.")
-
+        response_text += f"Text formatted: '{old_word}' will now be displayed as {formatted_word}"
+    
+    # Check if we performed both a replacement and a format
+    if 'replacements' in locals():
+        # Re-check if we need to apply formatting
+        format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
+        if format_match:
+            # If the replacement and format happen in the same command, apply format after replacements
+            old_word, format_type = format_match.groups()
+            if old_word in replacements:
+                formatted_word = apply_format(replacements[old_word], format_type)
+                if formatted_word:
+                    replacements[old_word] = formatted_word
+                    save_replacement_words(user_id, replacements)
+                    response_text = f"Word '{old_word}' replaced and formatted as: {formatted_word}"
+    
+    # If no match was found in any pattern
+    if 'response_text' not in locals():
+        response_text = ("Usage:\nFor word replacement: /replace \"WORD1\" \"WORD2\" ... -> \"NEW1\" \"NEW2\" ...\n"
+                         "For text formatting: /replace format \"WORD\" -> FORMAT_TYPE\n"
+                         "Valid format types: bold, italic, underline, backticks")
+    
     return await event.respond(response_text)
 
 # Command to show all saved replacements for a user
@@ -382,6 +398,8 @@ async def delete_all_replacements_command(event):
     # Delete all replacement data
     delete_all_replacements(user_id)
     return await event.respond("All your saved replacements have been deleted.")
+
+
 
 
 
