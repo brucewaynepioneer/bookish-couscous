@@ -236,6 +236,7 @@ def save_replacement_words(user_id, replacements):
 
 
 
+
 import re
 
 # Function to apply formatting to a string based on the format type
@@ -261,7 +262,7 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Updated regex to handle any number of word replacements
+    # Regex to handle any number of word replacements
     match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
     if match:
         # Extract old words and new words from the input command
@@ -283,14 +284,17 @@ async def replace_command(event):
         replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
-        # Ask the user if they want to apply formatting to the replaced words
+        # Create the response showing the replacements made and ask if formatting is required
         await event.respond(f"Replacements saved: {', '.join([f'{old} -> {new}' for old, new in replacements.items()])}\nDo you want to apply any formatting to the replacements? (yes/no)")
-        
-        # Wait for the user's response
+
+        # Wait for the user's response to check if they want to apply formatting
         response = await bot.wait_for(events.NewMessage(from_users=user_id))
-        
-        if response.raw_text.lower() == 'yes':
+
+        # If the user says 'yes', prompt for formatting input
+        if response.raw_text.strip().lower() == 'yes':
             await event.respond("Please provide the word and format type (options: bold, italic, underline, backticks). Format: /replace format \"WORD\" -> FORMAT_TYPE")
+
+            # Wait for the formatting command from the user
             response_format = await bot.wait_for(events.NewMessage(from_users=user_id))
 
             # Regex for formatting command: /replace format "WORD" -> FORMAT_TYPE
@@ -309,6 +313,7 @@ async def replace_command(event):
 
                 return await event.respond(f"Text formatted: '{word_to_format}' will now be displayed as {formatted_word}")
         
+        # If the user says 'no', finish the process without formatting
         else:
             return await event.respond("No formatting applied. The replacements have been saved.")
     
