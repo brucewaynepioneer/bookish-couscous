@@ -236,6 +236,22 @@ def save_replacement_words(user_id, replacements):
 
 
 
+import re
+
+# Function to apply formatting to a string based on the format type
+def apply_format(text, format_type):
+    format_map = {
+        "bold": "**",
+        "italic": "*",
+        "underline": "__",
+        "backticks": "`"
+    }
+    
+    if format_type not in format_map:
+        return None  # Invalid format type
+    
+    return f'{format_map[format_type]}{text}{format_map[format_type]}'
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -267,9 +283,34 @@ async def replace_command(event):
         replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
-        # Create the response showing the replacements made
-        replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
-        return await event.respond(f"Replacements saved: {replacement_summary}")
+        # Ask the user if they want to apply formatting to the replaced words
+        await event.respond(f"Replacements saved: {', '.join([f'{old} -> {new}' for old, new in replacements.items()])}\nDo you want to apply any formatting to the replacements? (yes/no)")
+        
+        # Wait for the user's response
+        response = await bot.wait_for(events.NewMessage(from_users=user_id))
+        
+        if response.raw_text.lower() == 'yes':
+            await event.respond("Please provide the word and format type (options: bold, italic, underline, backticks). Format: /replace format \"WORD\" -> FORMAT_TYPE")
+            response_format = await bot.wait_for(events.NewMessage(from_users=user_id))
+
+            # Regex for formatting command: /replace format "WORD" -> FORMAT_TYPE
+            format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', response_format.raw_text, re.UNICODE)
+            if format_match:
+                word_to_format, format_type = format_match.groups()
+                
+                # Apply the format using the appropriate symbols
+                formatted_word = apply_format(word_to_format, format_type)
+                if not formatted_word:
+                    return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
+                
+                # Save the formatted word replacement
+                formatted_replacements = {word_to_format: formatted_word}
+                save_replacement_words(user_id, formatted_replacements)
+
+                return await event.respond(f"Text formatted: '{word_to_format}' will now be displayed as {formatted_word}")
+        
+        else:
+            return await event.respond("No formatting applied. The replacements have been saved.")
     
     # Regex for single word replacement
     match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
