@@ -237,7 +237,7 @@ def save_replacement_words(user_id, replacements):
 
 
 
-import re
+
 
 # Function to apply formatting to a string based on the format type
 def apply_format(text, format_type):
