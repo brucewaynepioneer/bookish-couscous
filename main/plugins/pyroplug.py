@@ -239,6 +239,8 @@ def save_replacement_words(user_id, replacements):
 
 
 
+
+
 # Function to apply formatting to a string based on the format type
 def apply_format(text, format_type):
     format_map = {
@@ -284,24 +286,27 @@ async def replace_command(event):
         replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
-        # Create the response showing the replacements made and ask if formatting is required
+        # Ask the user if they want to apply formatting to the replaced words
         await event.respond(f"Replacements saved: {', '.join([f'{old} -> {new}' for old, new in replacements.items()])}\nDo you want to apply any formatting to the replacements? (yes/no)")
 
-        # Wait for the user's response to check if they want to apply formatting
+        # Listen for the next message from the user
         response = await bot.wait_for(events.NewMessage(from_users=user_id))
 
         # If the user says 'yes', prompt for formatting input
         if response.raw_text.strip().lower() == 'yes':
             await event.respond("Please provide the word and format type (options: bold, italic, underline, backticks). Format: /replace format \"WORD\" -> FORMAT_TYPE")
 
-            # Wait for the formatting command from the user
+            # Listen for the formatting command from the user
             response_format = await bot.wait_for(events.NewMessage(from_users=user_id))
+
+            # Add logging or print statements for debugging
+            print(f"User format input: {response_format.raw_text}")  # Check the input format
 
             # Regex for formatting command: /replace format "WORD" -> FORMAT_TYPE
             format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', response_format.raw_text, re.UNICODE)
             if format_match:
                 word_to_format, format_type = format_match.groups()
-                
+
                 # Apply the format using the appropriate symbols
                 formatted_word = apply_format(word_to_format, format_type)
                 if not formatted_word:
@@ -312,10 +317,15 @@ async def replace_command(event):
                 save_replacement_words(user_id, formatted_replacements)
 
                 return await event.respond(f"Text formatted: '{word_to_format}' will now be displayed as {formatted_word}")
+            else:
+                print("Regex didn't match the formatting command.")  # Debugging output
+                return await event.respond("Invalid format command. Please use: /replace format \"WORD\" -> FORMAT_TYPE")
         
         # If the user says 'no', finish the process without formatting
-        else:
+        elif response.raw_text.strip().lower() == 'no':
             return await event.respond("No formatting applied. The replacements have been saved.")
+        else:
+            return await event.respond("Invalid response. Please reply with 'yes' or 'no'.")
     
     # Regex for single word replacement
     match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
