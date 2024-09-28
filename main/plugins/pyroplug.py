@@ -245,14 +245,14 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Regex to handle 1 to 6 word replacements, supporting Unicode characters
-    match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*){1,6})\s*->\s*((?:\"[^\"]+\"\s*){1,6})', event.raw_text, re.UNICODE)
+    # Updated regex to handle any number of word replacements
+    match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
     if match:
-        # Extract the old words and new words from the command
+        # Extract old words and new words from the input command
         old_words = re.findall(r'"([^"]+)"', match.group(1))
         new_words = re.findall(r'"([^"]+)"', match.group(2))
 
-        # Check if the number of old words matches the number of new words
+        # Ensure that the number of old words matches the number of new words
         if len(old_words) != len(new_words):
             return await event.respond("The number of words/phrases to replace must match the number of new words/phrases.")
 
@@ -288,7 +288,11 @@ async def replace_command(event):
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
     
     # If no valid command format is found
-    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor up to 6 word replacements: /replace \"WORD1\" \"WORD2\" ... -> \"NEWWORD1\" \"NEWWORD2\" ...")
+    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor multiple word replacements: /replace \"WORD1\" \"WORD2\" ... -> \"NEWWORD1\" \"NEWWORD2\" ...")
+
+
+
+
 
     ##-----------------------------------------------##
     
