@@ -302,8 +302,8 @@ async def replace_command(event):
 
     response_text = ""
 
-    # Regex for replacing 1 to 6 words/phrases: /replace "WORD1" "WORD2" ... -> "NEW1" "NEW2" ...
-    match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*){1,6})\s*->\s*((?:\"[^\"]+\"\s*){1,6})', event.raw_text)
+    # 1. Improved regex for replacing 1 to 6 words/phrases (handles Unicode): /replace "WORD1" "WORD2" ... -> "NEW1" "NEW2" ...
+    match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*){1,6})\s*->\s*((?:\"[^\"]+\"\s*){1,6})', event.raw_text, re.UNICODE)
     if match:
         old_words = re.findall(r'"([^"]+)"', match.group(1))
         new_words = re.findall(r'"([^"]+)"', match.group(2))
@@ -323,9 +323,9 @@ async def replace_command(event):
         replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
         response_text += f"Replacements saved: {replacement_summary}\n"
 
-    # Handle single word replacement if no bulk replacement
+    # 2. Handle single word replacement if no bulk replacement
     match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
-    if match_single:
+    if match_single and not match:
         old_word, new_word = match_single.groups()
 
         delete_words = load_delete_words(user_id)
@@ -337,8 +337,8 @@ async def replace_command(event):
         save_replacement_words(user_id, replacements)
         response_text += f"Replacement saved: '{old_word}' will be replaced with '{new_word}'\n"
 
-    # Regex for formatting commands: /replace format "TEXT" -> "FORMAT_TYPE"
-    format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
+    # 3. Regex for formatting commands (handles Unicode): /replace format "TEXT" -> "FORMAT_TYPE"
+    format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text, re.UNICODE)
     if format_match:
         old_word, format_type = format_match.groups()
 
@@ -352,7 +352,7 @@ async def replace_command(event):
         save_replacement_words(user_id, replacements)
 
         response_text += f"Text formatted: '{old_word}' will now be displayed as {formatted_word}\n"
-    
+
     # If no match was found in any pattern
     if not response_text:
         response_text = ("Usage:\nFor word replacement: /replace \"WORD1\" \"WORD2\" ... -> \"NEW1\" \"NEW2\" ...\n"
