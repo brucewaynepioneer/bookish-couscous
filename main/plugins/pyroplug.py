@@ -321,12 +321,12 @@ async def replace_command(event):
 
         # Create a summary of replacements
         replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
-        response_text = f"Replacements saved: {replacement_summary}\n"
+        response_text += f"Replacements saved: {replacement_summary}\n"
 
     # Handle single word replacement if no bulk replacement
-    elif re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text):
-        match = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
-        old_word, new_word = match.groups()
+    match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text)
+    if match_single:
+        old_word, new_word = match_single.groups()
 
         delete_words = load_delete_words(user_id)
         if old_word in delete_words:
@@ -335,7 +335,7 @@ async def replace_command(event):
         # Perform the replacement for a single word
         replacements = {old_word: new_word}
         save_replacement_words(user_id, replacements)
-        response_text = f"Replacement saved: '{old_word}' will be replaced with '{new_word}'\n"
+        response_text += f"Replacement saved: '{old_word}' will be replaced with '{new_word}'\n"
 
     # Regex for formatting commands: /replace format "TEXT" -> "FORMAT_TYPE"
     format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', event.raw_text)
