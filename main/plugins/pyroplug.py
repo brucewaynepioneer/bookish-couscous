@@ -241,19 +241,26 @@ def save_replacement_words(user_id, replacements):
 
 
 
-# Function to apply formatting to a string based on the format type
-def apply_format(text, format_type):
+import re
+
+# Function to check if the replacement is already formatted (wrapped in symbols)
+def detect_formatting(text):
+    # Detect if the text is wrapped with common formatting symbols
     format_map = {
-        "bold": "**",
-        "italic": "*",
-        "underline": "__",
-        "backticks": "`"
+        "`": "backticks",      # Inline code
+        "**": "bold",          # Bold text
+        "*": "italic",         # Italic text
+        "__": "underline",     # Underlined text
+        "~~": "strikethrough", # Strikethrough text
+        "==": "highlight"      # Highlighted text (e.g., commonly used in markdown or custom rendering)
     }
     
-    if format_type not in format_map:
-        return None  # Invalid format type
+    for symbol, format_type in format_map.items():
+        # Check if the text starts and ends with the same symbol (for bold/italic, etc.)
+        if text.startswith(symbol) and text.endswith(symbol):
+            return format_type  # Detected a valid format
     
-    return f'{format_map[format_type]}{text}{format_map[format_type]}'
+    return None  # No formatting detected
 
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
@@ -282,50 +289,33 @@ async def replace_command(event):
         if any(old_word in delete_words for old_word in old_words):
             return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
+        # Detect if the replacement is wrapped in formatting symbols and apply them
+        replacements = {}
+        unrecognized_formats = []
+        for old_word, new_word in zip(old_words, new_words):
+            detected_format = detect_formatting(new_word)
+            if detected_format:
+                # The user has already provided a formatted replacement, so we'll save it as-is
+                replacements[old_word] = new_word
+            else:
+                # If the user has wrapped the text in unrecognized formatting, notify them
+                if new_word.startswith(('"', '`', '**', '*', '==', '~~')):
+                    unrecognized_formats.append(new_word)
+
+                # No formatting detected, save the raw replacement
+                replacements[old_word] = new_word
+
         # Save the replacements in MongoDB
-        replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
-        # Ask the user if they want to apply formatting to the replaced words
-        await event.respond(f"Replacements saved: {', '.join([f'{old} -> {new}' for old, new in replacements.items()])}\nDo you want to apply any formatting to the replacements? (yes/no)")
+        # Create the response showing the replacements made
+        replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
 
-        # Listen for the next message from the user
-        response = await bot.wait_for(events.NewMessage(from_users=user_id))
-
-        # If the user says 'yes', prompt for formatting input
-        if response.raw_text.strip().lower() == 'yes':
-            await event.respond("Please provide the word and format type (options: bold, italic, underline, backticks). Format: /replace format \"WORD\" -> FORMAT_TYPE")
-
-            # Listen for the formatting command from the user
-            response_format = await bot.wait_for(events.NewMessage(from_users=user_id))
-
-            # Add logging or print statements for debugging
-            print(f"User format input: {response_format.raw_text}")  # Check the input format
-
-            # Regex for formatting command: /replace format "WORD" -> FORMAT_TYPE
-            format_match = re.match(r'/replace\s+format\s+"([^"]+)"\s*->\s*(\w+)', response_format.raw_text, re.UNICODE)
-            if format_match:
-                word_to_format, format_type = format_match.groups()
-
-                # Apply the format using the appropriate symbols
-                formatted_word = apply_format(word_to_format, format_type)
-                if not formatted_word:
-                    return await event.respond(f"Invalid format type '{format_type}'. Valid options are: bold, italic, underline, backticks.")
-                
-                # Save the formatted word replacement
-                formatted_replacements = {word_to_format: formatted_word}
-                save_replacement_words(user_id, formatted_replacements)
-
-                return await event.respond(f"Text formatted: '{word_to_format}' will now be displayed as {formatted_word}")
-            else:
-                print("Regex didn't match the formatting command.")  # Debugging output
-                return await event.respond("Invalid format command. Please use: /replace format \"WORD\" -> FORMAT_TYPE")
-        
-        # If the user says 'no', finish the process without formatting
-        elif response.raw_text.strip().lower() == 'no':
-            return await event.respond("No formatting applied. The replacements have been saved.")
+        if unrecognized_formats:
+            unrecognized_str = ', '.join(unrecognized_formats)
+            return await event.respond(f"Replacements saved: {replacement_summary}\nWarning: Unrecognized format in: {unrecognized_str}")
         else:
-            return await event.respond("Invalid response. Please reply with 'yes' or 'no'.")
+            return await event.respond(f"Replacements saved: {replacement_summary}")
     
     # Regex for single word replacement
     match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
@@ -337,8 +327,15 @@ async def replace_command(event):
         if old_word in delete_words:
             return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
 
-        # Save the replacement in MongoDB
-        replacements = {old_word: new_word}
+        # Detect formatting in single replacement
+        detected_format = detect_formatting(new_word)
+        if detected_format:
+            # Save formatted replacement
+            replacements = {old_word: new_word}
+        else:
+            # Save plain replacement
+            replacements = {old_word: new_word}
+
         save_replacement_words(user_id, replacements)
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
