@@ -241,7 +241,6 @@ def save_replacement_words(user_id, replacements):
 
 
 
-import re
 
 # Function to check if the replacement is already formatted (wrapped in symbols)
 def detect_formatting(text):
