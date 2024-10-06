@@ -566,7 +566,7 @@ async def _bulk(event):
     if user_id in batch_data:
         return await event.reply("You've already started one batch, wait for it to complete!")
 
-    async with gagan.conversation(event.chat_id) as conv: 
+    async with gagan.conversation(event.chat_id) as conv:
         try:
             await conv.send_message(f"Send me the message link you want to start saving from, as a reply to this message.", buttons=Button.force_reply())
             link = await conv.get_reply()
@@ -580,7 +580,7 @@ async def _bulk(event):
             try:
                 value = int(_range.text)
                 if value > 1000:
-                    return await conv.send_message("You can only get upto 1000 files in a single batch...")
+                    return await conv.send_message("You can only get up to 1000 files in a single batch...")
             except ValueError:
                 return await conv.send_message("Range must be an integer!")
 
@@ -595,13 +595,21 @@ async def _bulk(event):
             batch_data[str(user_id)] = True
             save_batch_data(batch_data)
 
-            cd = await conv.send_message("**Batch process ongoing...**\n\nProcess completed: ", 
-                                    buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
-            co = await r_batch(userbot, Bot, user_id, cd, _link) 
-            try: 
+            # Send the batch processing message
+            cd = await conv.send_message(
+                "**Batch process ongoing...**\n\nProcess completed: ", 
+                buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]]
+            )
+            
+            # Pin the batch processing message
+            await Bot.pin_message(event.chat_id, message=cd.id)
+
+            # Process the batch
+            co = await r_batch(userbot, Bot, user_id, cd, _link)
+            try:
                 if co == -2:
                     await Bot.send_message(user_id, "Batch successfully completed!")
-                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed! ")
+                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed!")
             except:
                 await Bot.send_message(user_id, "ERROR!\n\n maybe last msg didn't exist yet")
             finally:
