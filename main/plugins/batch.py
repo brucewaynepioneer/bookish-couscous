@@ -568,9 +568,8 @@ async def _bulk(event):
     if user_id in batch_data:
         return await event.reply("You've already started one batch, wait for it to complete!")
 
-    async with gagan.conversation(event.chat_id) as conv:
+    async with gagan.conversation(event.chat_id) as conv: 
         try:
-            # Step 1: Ask for message link
             await conv.send_message(f"Send me the message link you want to start saving from, as a reply to this message.", buttons=Button.force_reply())
             link = await conv.get_reply()
             try:
@@ -578,55 +577,35 @@ async def _bulk(event):
             except Exception:
                 await conv.send_message("No link found...")
                 return
-
-            # Step 2: Ask for the range of files
             await conv.send_message(f"Send me the number of files/range you want to save from the given message, as a reply to this message.", buttons=Button.force_reply())
             _range = await conv.get_reply()
             try:
                 value = int(_range.text)
                 if value > 1000:
-                    return await conv.send_message("You can only get up to 1000 files in a single batch...")
+                    return await conv.send_message("You can only get upto 1000 files in a single batch...")
             except ValueError:
                 return await conv.send_message("Range must be an integer!")
 
-            # Step 3: Save user data
             ids_data[str(user_id)] = list(range(value))
             save_ids_data(ids_data)
 
-            # Step 4: Check if batch processing can start
             s, r = await check(userbot, Bot, _link, event)
             if s != True:
                 await conv.send_message(r)
                 return
 
-            # Step 5: Start the batch
             batch_data[str(user_id)] = True
             save_batch_data(batch_data)
 
-            # Send the batch processing message
-            cd = await conv.send_message(
-                "**Batch process ongoing...**\n\nProcess completed: ", 
-                buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]]
-            )
-
-            # Correct method for pinning the message in Telethon
-            try:
-                await Bot.pin_chat_message(event.chat_id, cd.id)  # Correct method
-            except Exception as pin_error:
-                await conv.send_message(f"Error pinning message: {pin_error}")
-                logger.error(f"Error pinning message: {pin_error}")
-                logger.error(traceback.format_exc())
-
-            # Process the batch
-            co = await r_batch(userbot, Bot, user_id, cd, _link)
-            try:
+            cd = await conv.send_message("**Batch process ongoing...**\n\nProcess completed: ", 
+                                    buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
+            co = await r_batch(userbot, Bot, user_id, cd, _link) 
+            try: 
                 if co == -2:
                     await Bot.send_message(user_id, "Batch successfully completed!")
-                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed!")
-            except Exception as batch_error:
-                await Bot.send_message(user_id, f"ERROR! {batch_error}\n\n maybe last msg didn't exist yet")
-                logger.error(f"Error during batch completion: {batch_error}")
-                logger.error(traceback.format_exc())
+                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed! ")
+            except:
+                await Bot.send_message(user_id, "ERROR!\n\n maybe last msg didn't exist yet")
             finally:
                 conv.cancel()
                 del batch_data[str(user_id)]
@@ -634,10 +613,8 @@ async def _bulk(event):
                 del ids_data[str(user_id)]
                 save_ids_data(ids_data)
         except Exception as e:
-            # Capture full exception and traceback
-            logger.error(f"An error occurred: {e}")
-            logger.error(traceback.format_exc())
-            await conv.send_message(f"An error occurred: {e}")
+            logger.info(e)
+            await conv.send_message("Processed")  
 
 
 
