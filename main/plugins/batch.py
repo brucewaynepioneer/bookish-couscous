@@ -559,7 +559,6 @@ async def _unhost(event):
 
 
 
-
 @gagan.on(events.NewMessage(incoming=True, pattern='/batch'))
 async def _bulk(event):
     user_id = event.sender_id
@@ -610,9 +609,9 @@ async def _bulk(event):
                 buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]]
             )
 
-            # Pin the batch processing message
+            # Correct method for pinning the message in Telethon
             try:
-                await Bot.pin_message(event.chat_id, message=cd.id)
+                await Bot.pin_chat_message(event.chat_id, cd.id)  # Correct method
             except Exception as pin_error:
                 await conv.send_message(f"Error pinning message: {pin_error}")
                 logger.error(f"Error pinning message: {pin_error}")
@@ -639,6 +638,7 @@ async def _bulk(event):
             logger.error(f"An error occurred: {e}")
             logger.error(traceback.format_exc())
             await conv.send_message(f"An error occurred: {e}")
+
 
 
 
