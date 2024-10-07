@@ -1,5 +1,4 @@
 import logging
-import traceback
 import time
 import os
 import sys
@@ -558,94 +557,62 @@ async def _unhost(event):
         await event.respond("No SRC bot found for your account.")
 
 
-
-@gagan.on(events.NewMessage(incoming=True, pattern='/bulk'))
-async def _batch(event):
+@gagan.on(events.NewMessage(incoming=True, pattern='/batch'))
+async def _bulk(event):
     user_id = event.sender_id
+    if user_id != OWNER_ID and user_id not in AUTHORIZED_USERS:
+        return await event.respond("The batch command is not available in public. You have to host your own bot to use this. Send /host BOT_TOKEN SESSION to host your own bot.")
 
-    # Step 1: Authorization check
-    if user_id not in AUTHORIZED_USERS:
-        return await event.respond("This command is available to Paid Plan users! Send /plan to know more.")
-  
-    # Step 2: Check if the user is already in a session
-    user_session = user_sessions.get(user_id)
-    if user_session:
-        return await event.respond("You can't use the /bulk command because you have added a session. Please use the /batch command instead.")
-
-    # Step 3: Check if the user has an ongoing batch
     if user_id in batch_data:
         return await event.reply("You've already started one batch, wait for it to complete!")
 
-    # Start the conversation
     async with gagan.conversation(event.chat_id) as conv: 
         try:
-            # Step 4: Ask for the message link
-            await conv.send_message("Send me the message link you want to start saving from, as a reply to this message.", buttons=Button.force_reply())
+            await conv.send_message(f"Send me the message link you want to start saving from, as a reply to this message.", buttons=Button.force_reply())
             link = await conv.get_reply()
             try:
-                _link = get_link(link.text)  # Parse the link
+                _link = get_link(link.text)
             except Exception:
                 await conv.send_message("No link found...")
                 return
-
-            # Step 5: Ask for the number of files (range)
-            await conv.send_message("Send me the number of files/range you want to save from the given message, as a reply to this message.", buttons=Button.force_reply())
+            await conv.send_message(f"Send me the number of files/range you want to save from the given message, as a reply to this message.", buttons=Button.force_reply())
             _range = await conv.get_reply()
             try:
                 value = int(_range.text)
                 if value > 1000:
-                    return await conv.send_message("You can only get up to 1000 files in a single batch...")
+                    return await conv.send_message("You can only get upto 1000 files in a single batch...")
             except ValueError:
                 return await conv.send_message("Range must be an integer!")
 
-            # Save data for the batch
             ids_data[str(user_id)] = list(range(value))
             save_ids_data(ids_data)
 
-            # Step 6: Check if the batch can be started
             s, r = await check(userbot, Bot, _link, event)
             if s != True:
                 await conv.send_message(r)
                 return
 
-            # Step 7: Mark the batch started
             batch_data[str(user_id)] = True
             save_batch_data(batch_data)
 
-            # Step 8: Announce the batch and pin the message
-            batch_msg = await conv.send_message(
-                "**Batch process ongoing...**\n\nChunks processed: 0", 
-                buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]]
-            )
-
-            try:
-                # Pin the message in DM
-                await event.client.pin_message(event.chat_id, message=batch_msg, notify=False)
-            except Exception as e:
-                await event.respond(f"Could not pin message: {e}")  # Notify on pinning failure
-
-            # Step 9: Run the batch processing
-            co, is_canceled = await run_batch(userbot, Bot, user_id, batch_msg, _link)
-
+            cd = await conv.send_message("**Batch process ongoing...**\n\nProcess completed: ", 
+                                    buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
+            co = await r_batch(userbot, Bot, user_id, cd, _link) 
             try: 
                 if co == -2:
                     await Bot.send_message(user_id, "Batch successfully completed!")
-                    await batch_msg.edit(f"**Batch process ongoing.**\n\nChunks processed: {len(chunk_tasks.get(str(user_id), []))} \n\nBatch successfully completed!")
+                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed! ")
+            except:
+                await Bot.send_message(user_id, "ERROR!\n\n maybe last msg didn't exist yet")
             finally:
-                if is_canceled:
-                    del batch_data[str(user_id)]
-                    save_batch_data(batch_data)
-                    del ids_data[str(user_id)]
-                    save_ids_data(ids_data)
-
-        # Log and report any errors that occur during the batch process
+                conv.cancel()
+                del batch_data[str(user_id)]
+                save_batch_data(batch_data)
+                del ids_data[str(user_id)]
+                save_ids_data(ids_data)
         except Exception as e:
             logger.info(e)
-            await conv.send_message("An error occurred while processing the batch.")
-
-
-
-
+            await conv.send_message("Processed")
 
 
 async def r_batch(userbot, client, sender, countdown, link):
