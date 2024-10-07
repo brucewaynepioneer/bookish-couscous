@@ -20,7 +20,6 @@ from main.plugins.pyroplug import user_sessions
 from telethon import events, Button, errors
 from telethon.tl.types import DocumentAttributeVideo
 from pyrogram import Client 
-from pyrogram import Client as PyroClient
 from pyrogram.errors import FloodWait
 
 logging.basicConfig(level=logging.DEBUG,
@@ -560,10 +559,6 @@ async def _unhost(event):
 
 
 
-
-# Assuming Pyrogram client is named pyrogram_client
-# Assuming Telethon client is named telethon_client
-
 @gagan.on(events.NewMessage(incoming=True, pattern='/batch'))
 async def _bulk(event):
     user_id = event.sender_id
@@ -573,9 +568,8 @@ async def _bulk(event):
     if user_id in batch_data:
         return await event.reply("You've already started one batch, wait for it to complete!")
 
-    async with gagan.conversation(event.chat_id) as conv:
+    async with gagan.conversation(event.chat_id) as conv: 
         try:
-            # Step 1: Get the link to start saving files
             await conv.send_message(f"Send me the message link you want to start saving from, as a reply to this message.", buttons=Button.force_reply())
             link = await conv.get_reply()
             try:
@@ -583,8 +577,6 @@ async def _bulk(event):
             except Exception:
                 await conv.send_message("No link found...")
                 return
-
-            # Step 2: Get the range/number of files to download
             await conv.send_message(f"Send me the number of files/range you want to save from the given message, as a reply to this message.", buttons=Button.force_reply())
             _range = await conv.get_reply()
             try:
@@ -597,7 +589,6 @@ async def _bulk(event):
             ids_data[str(user_id)] = list(range(value))
             save_ids_data(ids_data)
 
-            # Step 3: Check the link and initiate batch processing
             s, r = await check(userbot, Bot, _link, event)
             if s != True:
                 await conv.send_message(r)
@@ -606,27 +597,15 @@ async def _bulk(event):
             batch_data[str(user_id)] = True
             save_batch_data(batch_data)
 
-            # Send a message about ongoing batch process
             cd = await conv.send_message("**Batch process ongoing...**\n\nProcess completed: ", 
-                                         buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
-
-            # Step 4: Start the batch process (download using Pyrogram, upload using Telethon)
-            co = await r_batch(pyrogram_client, telethon_client, user_id, cd, _link)
-
-            # Pin the message in the bot chat once the first download/upload is complete
-            if co >= 1:
-                # Use Telethon to pin the message
-                await telethon_client.pin_message(event.chat_id, cd.id)
-
-                # Notify user in DM via Telethon that the first file has been processed
-                await telethon_client.send_message(user_id, "The first file has been processed, and the message has been pinned in the chat!")
-
+                                    buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
+            co = await r_batch(userbot, Bot, user_id, cd, _link) 
             try: 
                 if co == -2:
-                    await telethon_client.send_message(user_id, "Batch successfully completed!")
-                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed!")
+                    await Bot.send_message(user_id, "Batch successfully completed!")
+                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed! ")
             except:
-                await telethon_client.send_message(user_id, "ERROR!\n\nMaybe the last message didn't exist yet.")
+                await Bot.send_message(user_id, "ERROR!\n\n maybe last msg didn't exist yet")
             finally:
                 conv.cancel()
                 del batch_data[str(user_id)]
@@ -635,8 +614,7 @@ async def _bulk(event):
                 save_ids_data(ids_data)
         except Exception as e:
             logger.info(e)
-            await conv.send_message("Processed")
-
+            await conv.send_message("Processed")  
 
 
 
