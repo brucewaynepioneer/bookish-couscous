@@ -559,11 +559,15 @@ async def _unhost(event):
 
 
 
-@gagan.on(events.NewMessage(incoming=True, pattern='/batch'))
-async def _bulk(event):
+@gagan.on(events.NewMessage(incoming=True, pattern='/bulk'))
+async def _batch(event):
     user_id = event.sender_id
-    if user_id != OWNER_ID and user_id not in AUTHORIZED_USERS:
-        return await event.respond("The batch command is not available in public. You have to host your own bot to use this. Send /host BOT_TOKEN SESSION to host your own bot.")
+    if user_id not in AUTHORIZED_USERS:
+        return await event.respond("This command is available to Paid Plan users! Send /plan to know more.")
+  
+    user_session = user_sessions.get(user_id)
+    if user_session:
+        return await event.respond("You can't use the /bulk command because you have added a session. Please use the /batch command instead.")
 
     if user_id in batch_data:
         return await event.reply("You've already started one batch, wait for it to complete!")
@@ -582,7 +586,7 @@ async def _bulk(event):
             try:
                 value = int(_range.text)
                 if value > 1000:
-                    return await conv.send_message("You can only get upto 1000 files in a single batch...")
+                    return await conv.send_message("You can only get up to 1000 files in a single batch...")
             except ValueError:
                 return await conv.send_message("Range must be an integer!")
 
@@ -597,24 +601,31 @@ async def _bulk(event):
             batch_data[str(user_id)] = True
             save_batch_data(batch_data)
 
-            cd = await conv.send_message("**Batch process ongoing...**\n\nProcess completed: ", 
+            # Send the message indicating batch process start
+            cd = await conv.send_message("**Batch process ongoing...**\n\nChunks processed: 0", 
                                     buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
-            co = await r_batch(userbot, Bot, user_id, cd, _link) 
+
+            # Automatically pin the message
+            await event.client.pin_message(event.chat_id, message=cd, notify=False)
+
+
+            co, is_canceled = await run_batch(userbot, Bot, user_id, cd, _link) 
             try: 
                 if co == -2:
                     await Bot.send_message(user_id, "Batch successfully completed!")
-                    await cd.edit(f"**Batch process ongoing.**\n\nProcess completed: {value} \n\n Batch successfully completed! ")
+                    await cd.edit(f"**Batch process ongoing.**\n\nChunks processed: {len(chunk_tasks.get(str(user_id), []))} \n\nBatch successfully completed! ")
             except:
-                await Bot.send_message(user_id, "ERROR!\n\n maybe last msg didn't exist yet")
+                await Bot.send_message(user_id, "Reached to destination ....")
             finally:
-                conv.cancel()
-                del batch_data[str(user_id)]
-                save_batch_data(batch_data)
-                del ids_data[str(user_id)]
-                save_ids_data(ids_data)
+                if is_canceled:
+                    del batch_data[str(user_id)]
+                    save_batch_data(batch_data)
+                    del ids_data[str(user_id)]
+                    save_ids_data(ids_data)
         except Exception as e:
             logger.info(e)
-            await conv.send_message("Processed")  
+            await conv.send_message("Processed")
+
 
 
 
