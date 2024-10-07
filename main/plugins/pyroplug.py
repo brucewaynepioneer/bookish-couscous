@@ -1,4 +1,5 @@
 
+
 #uwill
 import re
 import asyncio, time, os
@@ -1080,120 +1081,150 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
             if msg.media == MessageMediaType.POLL:
                 await client.edit_message_text(sender, edit_id, 'poll media cant be saved')
                 return 
-            edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
-            user_session = user_sessions.get(sender)
-            if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
-              await user_bot.stop()
-            else:
-              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
-            custom_rename_tag = get_user_rename_preference(sender)
-            # retriving name 
-            last_dot_index = str(file).rfind('.')
-            if last_dot_index != -1 and last_dot_index != 0:
-              original_file_name = str(file)[:last_dot_index]
-              file_extension = str(file)[last_dot_index + 1:]
-            else:
-              original_file_name = str(file)
-              file_extension = 'mp4'
+
+# Initialize a flag to keep track of whether the first media is pinned
+is_first_pinned = False
+
+async def process_message(sender, msg, client, user_sessions, user_bot):
+    global is_first_pinned  # Use the global flag to track the first pin
+
+    try:
+        # Edit the message to indicate download has started
+        edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
+        
+        # Check user session
+        user_session = user_sessions.get(sender)
+        if user_session:
+            file = await user_bot.download_media(msg, progress=progress_for_pyrogram, 
+                                                 progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
+            await user_bot.stop()
+        else:
+            file = await userbot.download_media(msg, progress=progress_for_pyrogram, 
+                                                progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
+        
+        # Retrieve custom renaming preference
+        custom_rename_tag = get_user_rename_preference(sender)
+        
+        # Extract file name and extension
+        last_dot_index = str(file).rfind('.')
+        if last_dot_index != -1 and last_dot_index != 0:
+            original_file_name = str(file)[:last_dot_index]
+            file_extension = str(file)[last_dot_index + 1:]
+        else:
+            original_file_name = str(file)
+            file_extension = 'mp4'
+        
+        # Remove unwanted words from the file name
+        delete_words = load_delete_words(sender)
+        for word in delete_words:
+            original_file_name = original_file_name.replace(word, "")
+        
+        # Create new file name with custom rename tag
+        video_file_name = original_file_name + " " + custom_rename_tag
+        new_file_name = original_file_name + " " + custom_rename_tag + "." + file_extension
+        os.rename(file, new_file_name)
+        file = new_file_name
+        
+        path = file
+        await edit.delete()
+
+        # Prepare for upload
+        upm = await client.send_message(sender, 'Preparing to Upload!')
+        caption = msg.caption if msg.caption is not None else str(file)
+        
+        # Pin the message after the first download and upload
+        if not is_first_pinned:
+            await client.pin_message(sender, upm.id)
+            is_first_pinned = True  # Mark the first message as pinned
+
+        # Uploading logic based on file type
+        if file_extension in ['mkv', 'mp4', 'webm', 'mpe4', 'mpeg', 'ts', 'avi', 'flv', 'org', 'm4v']:
+            if file_extension in ['webm', 'mkv', 'mpe4', 'mpeg', 'ts', 'avi', 'flv', 'org', 'm4v']:
+                path = video_file_name + ".mp4"
+                os.rename(file, path)
+                file = path
+            data = video_metadata(file)
+            duration = data["duration"]
+            wi = data["width"]
+            hi = data["height"]
+            logging.info(data)
             
-            #Removing Words
+            if file_n != '':
+                if '.' in file_n:
+                    path = f'/app/downloads/{file_n}'
+                else:
+                    path = f'/app/downloads/{file_n}.' + str(file).split(".")[-1]
+                os.rename(file, path)
+                file = path
+
+            thumb_path = await screenshot(file, duration, sender)
+            
+            # Modify the caption based on user's preference
+            custom_caption = get_user_caption_preference(sender)
+            original_caption = msg.caption if msg.caption else ''
+            final_caption = original_caption if custom_caption else original_caption
             delete_words = load_delete_words(sender)
             for word in delete_words:
-              original_file_name = original_file_name.replace(word, "")
+                final_caption = final_caption.replace(word, ' ')
+            replacements = load_replacement_words(sender)
+            for word, replace_word in replacements.items():
+                final_caption = final_caption.replace(word, replace_word)
             
-            # Rename the file with the updated file name and custom renaming tag
-            video_file_name = original_file_name + " " + custom_rename_tag
-            new_file_name = original_file_name + " " + custom_rename_tag + "." + file_extension
-            os.rename(file, new_file_name)
-            file = new_file_name   
-          
-            path = file
-            await edit.delete()
-            upm = await client.send_message(sender, 'Preparing to Upload!')
+            caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
             
-            caption = str(file)
-            if msg.caption is not None:
-                caption = msg.caption
-            if file_extension in ['mkv', 'mp4', 'webm', 'mpe4', 'mpeg', 'ts', 'avi', 'flv', 'org', 'm4v']:
-                if file_extension in ['webm', 'mkv', 'mpe4', 'mpeg', 'ts', 'avi', 'flv', 'org', 'm4v']:
-                    path = video_file_name + ".mp4"
-                    os.rename(file, path) 
-                    file = path
-                data = video_metadata(file)
-                duration = data["duration"]
-                wi = data["width"]
-                hi = data["height"]
-                logging.info(data)
+            await send_video_with_chat_id(client, sender, path, caption, duration, hi, wi, thumb_path, upm)
+        
+        elif str(file).split(".")[-1] in ['jpg', 'jpeg', 'png', 'webp']:
+            if file_n != '':
+                if '.' in file_n:
+                    path = f'/app/downloads/{file_n}'
+                else:
+                    path = f'/app/downloads/{file_n}.' + str(file).split(".")[-1]
+                os.rename(file, path)
+                file = path
 
-                if file_n != '':
-                    if '.' in file_n:
-                        path = f'/app/downloads/{file_n}'
-                    else:
-                        path = f'/app/downloads/{file_n}.' + str(file).split(".")[-1]
+            caption = msg.caption if msg.caption is not None else str(file).split("/")[-1]
+            await upm.edit("Uploading photo...")
+            await bot.send_file(sender, path, caption=caption)
+        
+        else:
+            if file_n != '':
+                if '.' in file_n:
+                    path = f'/app/downloads/{file_n}'
+                else:
+                    path = f'/app/downloads/{file_n}.' + str(file).split(".")[-1]
+                os.rename(file, path)
+                file = path
+            thumb_path = thumbnail(sender)
+            
+            # Modify caption for other file types
+            custom_caption = get_user_caption_preference(sender)
+            original_caption = msg.caption if msg.caption else ''
+            final_caption = original_caption if custom_caption else original_caption
+            delete_words = load_delete_words(sender)
+            for word in delete_words:
+                final_caption = final_caption.replace(word, ' ')
+            replacements = load_replacement_words(sender)
+            for word, replace_word in replacements.items():
+                final_caption = final_caption.replace(word, replace_word)
+            
+            caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
+            
+            await send_document_with_chat_id(client, sender, path, caption, thumb_path, upm)
+        
+        # Clean up
+        os.remove(file)
+        await upm.delete()
+        return None
 
-                    os.rename(file, path)
-                    file = path
-                thumb_path = await screenshot(file, duration, sender)
-                # Modify the caption based on user's custom caption preference
-                custom_caption = get_user_caption_preference(sender)
-                original_caption = msg.caption if msg.caption else ''
-                final_caption = f"{original_caption}" if custom_caption else f"{original_caption}"
-                delete_words = load_delete_words(sender)
-                for word in delete_words:
-                  final_caption = final_caption.replace(word, '  ')
-                replacements = load_replacement_words(sender)
-                for word, replace_word in replacements.items():
-                  final_caption = final_caption.replace(word, replace_word)  
-                # final_caption = re.sub(r'\s{2,}', '  ', final_caption.strip())
-                # final_caption = re.sub(r'\n{2,}', '\n\n', final_caption)
-                caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
-                await send_video_with_chat_id(client, sender, path, caption, duration, hi, wi, thumb_path, upm)
-            elif str(file).split(".")[-1] in ['jpg', 'jpeg', 'png', 'webp']:
-                if file_n != '':
-                    if '.' in file_n:
-                        path = f'/app/downloads/{file_n}'
-                    else:
-                        path = f'/app/downloads/{file_n}.' + str(file).split(".")[-1]
-                    os.rename(file, path)
-                    file = path
-                caption = msg.caption if msg.caption is not None else str(file).split("/")[-1]
-                await upm.edit("Uploading photo...")
-                await bot.send_file(sender, path, caption=caption)
-            else:
-                if file_n != '':
-                    if '.' in file_n:
-                        path = f'/app/downloads/{file_n}'
-                    else:
-                        path = f'/app/downloads/{file_n}.' + str(file).split(".")[-1]
-                    os.rename(file, path)
-                    file = path
-                thumb_path = thumbnail(sender)
-                # Modify the caption based on user's custom caption preference
-                custom_caption = get_user_caption_preference(sender)
-                original_caption = msg.caption if msg.caption else ''
-                final_caption = f"{original_caption}" if custom_caption else f"{original_caption}"
-                delete_words = load_delete_words(sender)
-                for word in delete_words:
-                  final_caption = final_caption.replace(word, '  ')
-                replacements = load_replacement_words(sender)
-                for word, replace_word in replacements.items():
-                  final_caption = final_caption.replace(word, replace_word)  
-                # final_caption = re.sub(r'\s{2,}', '  ', final_caption.strip())
-                # final_caption = re.sub(r'\n{2,}', '\n\n', final_caption)
-                caption = f"`{final_caption}`\n\n__**`{custom_caption}`**__" if custom_caption else f"`{final_caption}`"
-                await send_document_with_chat_id(client, sender, path, caption, thumb_path, upm)
-                    
-            os.remove(file)
-            await upm.delete()
-            return None
-        except (ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid):
-            await client.edit_message_text(sender, edit_id, "Bot is not in that channel/group \nsend the invite or add session vioa command /addsession link so that bot can join the channel\n\nTo generate session you can use our official bot - @stringsessionAK47bot")
-            return None
+    except (ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid):
+        await client.edit_message_text(sender, edit_id, "Bot is not in that channel/group.\nSend the invite or add the session via command /addsession link.")
+        return None
+
     else:
+        # Handle cloning message without downloading
         edit = await client.edit_message_text(sender, edit_id, "Cloning.")
-        chat =  msg_link.split("/")[-2]
+        chat = msg_link.split("/")[-2]
         await copy_message_with_chat_id(client, sender, chat, msg_id)
         await edit.delete()
-        return None   
-      
+        return None
