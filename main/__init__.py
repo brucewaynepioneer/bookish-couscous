@@ -1,11 +1,10 @@
-
 from telethon.errors import FloodWaitError
 from datetime import datetime as dt, timedelta
 import asyncio
 import sys
-from telethon import Client
+from pyrogram import Client
 import uvloop
-from telethon.errors import FloodWait
+from pyrogram.errors import FloodWait
 from telethon.sessions import StringSession
 from telethon.sync import TelegramClient
 from decouple import config
@@ -14,7 +13,7 @@ import logging, time
 # Setup logging
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logging.getLogger("telethon").setLevel(logging.WARNING)
+logging.getLogger("pyrogram").setLevel(logging.WARNING)
 logging.getLogger("telethon").setLevel(logging.WARNING)
 
 # Use uvloop for better performance
