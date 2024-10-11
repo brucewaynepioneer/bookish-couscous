@@ -4,22 +4,23 @@ import re
 import asyncio, time, os
 import pymongo
 from decouple import config
-from telethon.enums import ParseMode, MessageMediaType
-from telethon import TelegramClient, events  # Corrected the Client import
-from telethon.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
-from telethon.raw.functions.channels import GetMessages
-from main.plugins.progress import progress_for_telethon
-from main.plugins.helpers import screenshot, video_metadata
+from pyrogram.enums import ParseMode, MessageMediaType
+from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB  # Import from __init__.py
+from main.plugins.progress import progress_for_pyrogram
+from main.plugins.helpers import screenshot
+from pyrogram import Client, filters
+from pyrogram.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
+from pyrogram.raw.functions.channels import GetMessages
+from main.plugins.helpers import video_metadata
+from telethon import events
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logging.getLogger("pyrogram").setLevel(logging.INFO)
 logging.getLogger("telethon").setLevel(logging.INFO)
-
-# Ensure these imports are correct based on your project structure
-from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB
 
 # MongoDB database name and collection name
 DB_NAME = "smart_users"
@@ -127,7 +128,7 @@ async def send_document_with_chat_id(client, sender, path, caption, thumb_path, 
             caption=caption,
             thumb=thumb_path,
             reply_to_message_id=thread_id,
-            progress=progress_for_telethon,
+            progress=progress_for_pyrogram,
             progress_args=(
                 client,
                 '**__Uploading:__**\n**__Bot made by [kingofpatal](https://t.me/kingofpatal)__**',
@@ -159,7 +160,7 @@ async def send_video_with_chat_id(client, sender, path, caption, duration, hi, w
             height=hi,
             thumb=thumb_path,
             reply_to_message_id=thread_id,
-            progress=progress_for_telethon,
+            progress=progress_for_pyrogram,
             progress_args=(
                 client,
                 '**__Uploading: [kingofpatal](https://t.me/kingofpatal)__**\n ',
@@ -235,31 +236,6 @@ def save_replacement_words(user_id, replacements):
 
 
 
-
-
-
-
-
-
-# Function to check if the replacement is already formatted (wrapped in symbols)
-def detect_formatting(text):
-    # Detect if the text is wrapped with common formatting symbols
-    format_map = {
-        "`": "backticks",      # Inline code
-        "**": "bold",          # Bold text
-        "*": "italic",         # Italic text
-        "__": "underline",     # Underlined text
-        "~~": "strikethrough", # Strikethrough text
-        "==": "highlight"      # Highlighted text (e.g., commonly used in markdown or custom rendering)
-    }
-    
-    for symbol, format_type in format_map.items():
-        # Check if the text starts and ends with the same symbol (for bold/italic, etc.)
-        if text.startswith(symbol) and text.endswith(symbol):
-            return format_type  # Detected a valid format
-    
-    return None  # No formatting detected
-
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -269,7 +245,7 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Regex to handle any number of word replacements
+    # Updated regex to handle any number of word replacements
     match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
     if match:
         # Extract old words and new words from the input command
@@ -287,33 +263,13 @@ async def replace_command(event):
         if any(old_word in delete_words for old_word in old_words):
             return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
-        # Detect if the replacement is wrapped in formatting symbols and apply them
-        replacements = {}
-        unrecognized_formats = []
-        for old_word, new_word in zip(old_words, new_words):
-            detected_format = detect_formatting(new_word)
-            if detected_format:
-                # The user has already provided a formatted replacement, so we'll save it as-is
-                replacements[old_word] = new_word
-            else:
-                # If the user has wrapped the text in unrecognized formatting, notify them
-                if new_word.startswith(('"', '`', '**', '*', '==', '~~')):
-                    unrecognized_formats.append(new_word)
-
-                # No formatting detected, save the raw replacement
-                replacements[old_word] = new_word
-
         # Save the replacements in MongoDB
+        replacements = dict(zip(old_words, new_words))
         save_replacement_words(user_id, replacements)
 
         # Create the response showing the replacements made
         replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
-
-        if unrecognized_formats:
-            unrecognized_str = ', '.join(unrecognized_formats)
-            return await event.respond(f"Replacements saved: {replacement_summary}\nWarning: Unrecognized format in: {unrecognized_str}")
-        else:
-            return await event.respond(f"Replacements saved: {replacement_summary}")
+        return await event.respond(f"Replacements saved: {replacement_summary}")
     
     # Regex for single word replacement
     match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
@@ -325,15 +281,8 @@ async def replace_command(event):
         if old_word in delete_words:
             return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
 
-        # Detect formatting in single replacement
-        detected_format = detect_formatting(new_word)
-        if detected_format:
-            # Save formatted replacement
-            replacements = {old_word: new_word}
-        else:
-            # Save plain replacement
-            replacements = {old_word: new_word}
-
+        # Save the replacement in MongoDB
+        replacements = {old_word: new_word}
         save_replacement_words(user_id, replacements)
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
@@ -443,45 +392,24 @@ def get_user_caption_preference(user_id):
     # Retrieve the user's custom caption if set, or default to an empty string
     return user_caption_preferences.get(str(user_id), '')
 
-
-
-SUPER_USERS = load_authorized_users()  # Example superuser IDs
-user_chat_ids = {}  # Store user chat IDs and thread IDs
-
 @bot.on(events.NewMessage(incoming=True, pattern='/setchat'))
 async def set_chat_id(event):
     user_id = event.sender_id
-    
-    # Check for authorization
     if user_id not in SUPER_USERS:
         return await event.respond("This command is available to authorized users only.")
     
     try:
-        # Extract the command and parameters
-        parts = event.raw_text.strip().split(" ", 1)
+        parts = event.raw_text.split(" ", 1)
+        if len(parts) < 2:
+            return await event.reply("Please provide the chat ID after the command.")
         
-        # Ensure chat_id and thread_id are provided
-        if len(parts) < 2 or not parts[1].strip():
-            return await event.reply("Usage: /setchat <chat_id> <thread_id>")
-        
-        # Validate chat_id and thread_id using regex to ensure they're numbers
-        match = re.match(r"(\d+)\s+(\d+)", parts[1].strip())
-        if not match:
-            return await event.reply("Invalid format! Please provide both chat ID and thread ID as integers.")
-        
-        # Extract chat_id and thread_id
-        chat_id, thread_id = map(int, match.groups())
-        
-        # Store the user’s chat_id and thread_id
+        chat_id, thread_id = map(int, parts[1].split())
         user_chat_ids[user_id] = (chat_id, thread_id)
-        await event.reply(f"Chat ID {chat_id} and Thread ID {thread_id} set successfully!")
-    
-    except ValueError as ve:
-        await event.reply(f"Invalid input! Please ensure both chat ID and thread ID are valid integers.\nError: {ve}")
+        await event.reply("Chat ID and Thread ID set successfully!")
+    except ValueError:
+        await event.reply("Invalid chat ID or thread ID!")
     except Exception as e:
-        # Catch any other unforeseen errors
-        await event.reply(f"An unexpected error occurred: {e}")
-
+        await event.reply(f"An error occurred: {e}")
 
         
         
@@ -745,10 +673,10 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
@@ -937,7 +865,7 @@ async def x(userbot, client, sender, edit_id, msg_link, i, file_n):
             
             file = await userbot.download_media(
                 msg,
-                progress=progress_for_telethon,
+                progress=progress_for_pyrogram,
                 progress_args=(
                     client,
                     "**__Downloading__: __[Team SPY](https://t.me/dev_gagan)__**\n ",
@@ -1103,10 +1031,10 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
