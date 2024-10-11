@@ -5,14 +5,11 @@ import asyncio, time, os
 import pymongo
 from decouple import config
 from telethon.enums import ParseMode, MessageMediaType
-from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB  # Import from __init__.py
-from main.plugins.progress import progress_for_telethon
-from main.plugins.helpers import screenshot
-from telethon import Client, filters
+from telethon import TelegramClient, events  # Corrected the Client import
 from telethon.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
 from telethon.raw.functions.channels import GetMessages
-from main.plugins.helpers import video_metadata
-from telethon import events
+from main.plugins.progress import progress_for_telethon
+from main.plugins.helpers import screenshot, video_metadata
 import logging
 
 # Configure logging
@@ -20,7 +17,9 @@ logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logging.getLogger("telethon").setLevel(logging.INFO)
-logging.getLogger("telethon").setLevel(logging.INFO)
+
+# Ensure these imports are correct based on your project structure
+from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB
 
 # MongoDB database name and collection name
 DB_NAME = "smart_users"
