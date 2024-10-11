@@ -1,7 +1,9 @@
 tgcrypto
 numpy<2
 psutil
-https://www.dl.dropboxusercontent.com/scl/fi/ge9wkots40hq2fdt64z8a/ggnpyro.zip?rlkey=9ovewxnj083a78pgm9rgceg8u&st=x45ccejq&dl=0
+telethon
+cryptg
+#https://www.dl.dropboxusercontent.com/scl/fi/ge9wkots40hq2fdt64z8a/ggnpyro.zip?rlkey=9ovewxnj083a78pgm9rgceg8u&st=x45ccejq&dl=0
 opencv-python-headless
 python-decouple
 requests
