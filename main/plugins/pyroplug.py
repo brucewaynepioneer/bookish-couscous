@@ -4,13 +4,13 @@ import re
 import asyncio, time, os
 import pymongo
 from decouple import config
-from pyrogram.enums import ParseMode, MessageMediaType
+from telethon.enums import ParseMode, MessageMediaType
 from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB  # Import from __init__.py
-from main.plugins.progress import progress_for_pyrogram
+from main.plugins.progress import progress_for_telethon
 from main.plugins.helpers import screenshot
-from pyrogram import Client, filters
-from pyrogram.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
-from pyrogram.raw.functions.channels import GetMessages
+from telethon import Client, filters
+from telethon.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
+from telethon.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
 from telethon import events
 import logging
@@ -19,7 +19,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logging.getLogger("pyrogram").setLevel(logging.INFO)
+logging.getLogger("telethon").setLevel(logging.INFO)
 logging.getLogger("telethon").setLevel(logging.INFO)
 
 # MongoDB database name and collection name
@@ -128,7 +128,7 @@ async def send_document_with_chat_id(client, sender, path, caption, thumb_path, 
             caption=caption,
             thumb=thumb_path,
             reply_to_message_id=thread_id,
-            progress=progress_for_pyrogram,
+            progress=progress_for_telethon,
             progress_args=(
                 client,
                 '**__Uploading:__**\n**__Bot made by [kingofpatal](https://t.me/kingofpatal)__**',
@@ -160,7 +160,7 @@ async def send_video_with_chat_id(client, sender, path, caption, duration, hi, w
             height=hi,
             thumb=thumb_path,
             reply_to_message_id=thread_id,
-            progress=progress_for_pyrogram,
+            progress=progress_for_telethon,
             progress_args=(
                 client,
                 '**__Uploading: [kingofpatal](https://t.me/kingofpatal)__**\n ',
@@ -746,10 +746,10 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
@@ -938,7 +938,7 @@ async def x(userbot, client, sender, edit_id, msg_link, i, file_n):
             
             file = await userbot.download_media(
                 msg,
-                progress=progress_for_pyrogram,
+                progress=progress_for_telethon,
                 progress_args=(
                     client,
                     "**__Downloading__: __[Team SPY](https://t.me/dev_gagan)__**\n ",
@@ -1104,10 +1104,10 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
             edit = await client.edit_message_text(sender, edit_id, "Trying to Download.")
             user_session = user_sessions.get(sender)
             if user_session:
-              file = await user_bot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
+              file = await user_bot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))
               await user_bot.stop()
             else:
-              file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
+              file = await userbot.download_media(msg, progress=progress_for_telethon, progress_args=(client, "**__Downloading__: __[kingofpatal](https://t.me/kingofpatal)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@kingofpatal' otherwise
             custom_rename_tag = get_user_rename_preference(sender)
             # retriving name 
             last_dot_index = str(file).rfind('.')
