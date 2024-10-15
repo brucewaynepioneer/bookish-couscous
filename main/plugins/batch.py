@@ -196,15 +196,12 @@ async def _batch(event):
 
             cd = await conv.send_message("**Batch process ongoing...**\n\nChunks processed: 0", 
                                     buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
-            await conv.pin_message(cd)
-            
             co, is_canceled = await run_batch(userbot, Bot, user_id, cd, _link) 
             try: 
                 if co == -2:
                     await Bot.send_message(user_id, "Batch successfully completed!")
-                    await cd.edit(f"Batch process ongoing.\n\nChunks processed: {len(chunk_tasks.get(str(user_id), []))} \n\nBatch successfully completed! ")
-                    
-            except Exception as e:
+                    await cd.edit(f"**Batch process ongoing.**\n\nChunks processed: {len(chunk_tasks.get(str(user_id), []))} \n\nBatch successfully completed! ")
+            except:
                 await Bot.send_message(user_id, "Reached to destination ....")
             finally:
                 if is_canceled:
@@ -600,6 +597,7 @@ async def _bulk(event):
 
             cd = await conv.send_message("**Batch process ongoing...**\n\nProcess completed: ", 
                                     buttons=[[Button.url("Join Channel", url="http://t.me/devggn")]])
+            await cd.pin()
             co = await r_batch(userbot, Bot, user_id, cd, _link) 
             try: 
                 if co == -2:
