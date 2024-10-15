@@ -200,8 +200,8 @@ async def _batch(event):
             try: 
                 if co == -2:
                     await Bot.send_message(user_id, "Batch successfully completed!")
-                    ankit = await cd.edit(f"**Batch process ongoing.**\n\nChunks processed: {len(chunk_tasks.get(str(user_id), []))} \n\nBatch successfully completed! ")
-                    ankit = await ankit.pin(both_side=True)
+                    ankit = await cd.edit(f"Batch process ongoing.\n\nChunks processed: {len(chunk_tasks.get(str(user_id), []))} \n\nBatch successfully completed! ")
+                    await Bot.pin_chat_message(chat_id, ankit.message_id, both_sides=True)
             except Exception as e:
                 await Bot.send_message(user_id, "Reached to destination ....")
             finally:
