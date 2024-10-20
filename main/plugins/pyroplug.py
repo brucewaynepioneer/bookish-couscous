@@ -1,4 +1,5 @@
 
+
 #uwill
 import re
 import asyncio, time, os
@@ -12,6 +13,7 @@ from pyrogram import Client, filters
 from pyrogram.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
 from pyrogram.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
+from some_database_module import load_delete_words, save_replacement_words, save_filename_replacement
 from telethon import events
 import logging
 
@@ -236,6 +238,8 @@ def save_replacement_words(user_id, replacements):
 
 
 
+
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -287,8 +291,24 @@ async def replace_command(event):
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
     
+    # Regex for filename replacement
+    match_filename = re.match(r'/replace\s+filename\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
+    if match_filename:
+        old_filename, new_filename = match_filename.groups()
+
+        # Logic to handle filename replacement
+        if old_filename and new_filename:
+            # Save the filename replacement in MongoDB or another persistent storage
+            save_filename_replacement(user_id, old_filename, new_filename)
+            return await event.respond(f"Filename replacement saved: '{old_filename}' -> '{new_filename}'")
+        else:
+            return await event.respond("Invalid filename replacement format.")
+    
     # If no valid command format is found
-    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\nFor multiple word replacements: /replace \"WORD1\" \"WORD2\" ... -> \"NEWWORD1\" \"NEWWORD2\" ...")
+    return await event.respond("Usage:\nFor single word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\n"
+                               "For multiple word replacements: /replace \"WORD1\" \"WORD2\" ... -> \"NEWWORD1\" \"NEWWORD2\" ...\n"
+                               "For filename replacement: /replace filename \"OLD_FILENAME\" -> \"NEW_FILENAME\"")
+
 
 
 
