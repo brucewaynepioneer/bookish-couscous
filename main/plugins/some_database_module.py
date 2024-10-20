@@ -1,5 +1,6 @@
 # some_database_module.py
 from pymongo import MongoClient
+from .. import Bot, bot, OWNER_ID, LOG_GROUP, MONGODB
 
 # Establish a connection to MongoDB using the connection string from __init__.py
 MONGODB_CONNECTION_STRING = config("MONGODB")
