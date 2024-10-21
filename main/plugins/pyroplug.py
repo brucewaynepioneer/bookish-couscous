@@ -13,6 +13,7 @@ from pyrogram import Client, filters
 from pyrogram.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
 from pyrogram.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
+# from some_database_module import load_delete_words, save_replacement_words, save_filename_replacement
 from telethon import events
 import logging
 
@@ -226,9 +227,6 @@ def load_replacement_words(user_id):
 
 # Modify the save_replacement_words function to handle filename replacements too
 def save_replacement_words(user_id, replacements, filename_replacements=None):
-    """
-    Save word and filename replacements for a specific user to MongoDB
-    """
     try:
         update_data = {"replacement_words": replacements}
         
@@ -244,9 +242,6 @@ def save_replacement_words(user_id, replacements, filename_replacements=None):
         print(f"Error saving replacement words or filenames: {e}")
 
 def load_replacement_words(user_id):
-    """
-    Load replacement words and filename replacements for a specific user from MongoDB
-    """
     try:
         words_data = collection.find_one({"_id": user_id})
         if words_data:
@@ -254,10 +249,10 @@ def load_replacement_words(user_id):
             filename_replacements = words_data.get("filename_replacements", {})
             return replacements, filename_replacements
         else:
-            return {}, {}
+            return {}, {}  # Ensure it always returns dictionaries
     except Exception as e:
         print(f"Error loading replacement words or filenames: {e}")
-        return {}, {}
+        return {}, {}  # Always return dictionaries
 
 # Updated /replace command handler
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
@@ -269,10 +264,9 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Updated regex to handle any number of word replacements
+    # Handle word replacements
     match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
     if match:
-        # Extract old words and new words from the input command
         old_words = re.findall(r'"([^"]+)"', match.group(1))
         new_words = re.findall(r'"([^"]+)"', match.group(2))
 
@@ -284,14 +278,19 @@ async def replace_command(event):
             return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
         replacements, filename_replacements = load_replacement_words(user_id)
-        replacements.update(dict(zip(old_words, new_words)))
+        
+        # Ensure replacements is a dict before updating
+        if isinstance(replacements, dict):
+            replacements.update(dict(zip(old_words, new_words)))
+        else:
+            replacements = dict(zip(old_words, new_words))  # Convert to dict if necessary
 
-        # Save the replacements and filename replacements in MongoDB
         save_replacement_words(user_id, replacements, filename_replacements)
 
         replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
         return await event.respond(f"Replacements saved: {replacement_summary}")
     
+    # Handle filename replacements
     match_filename = re.match(r'/replace\s+filename\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
     if match_filename:
         old_filename, new_filename = match_filename.groups()
@@ -299,14 +298,12 @@ async def replace_command(event):
         replacements, filename_replacements = load_replacement_words(user_id)
         filename_replacements[old_filename] = new_filename
 
-        # Save the word replacements and filename replacements
         save_replacement_words(user_id, replacements, filename_replacements)
 
         return await event.respond(f"Filename replacement saved: '{old_filename}' -> '{new_filename}'")
     
     return await event.respond("Usage:\nFor word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\n"
                                "For filename replacement: /replace filename \"OLD_FILENAME\" -> \"NEW_FILENAME\"")
-
 
 
 
