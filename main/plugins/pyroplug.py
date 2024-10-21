@@ -13,6 +13,7 @@ from pyrogram import Client, filters
 from pyrogram.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid, FloodWait
 from pyrogram.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
+from some_database_module import load_delete_words, save_replacement_words, save_filename_replacement
 from telethon import events
 import logging
 
@@ -298,7 +299,7 @@ async def replace_command(event):
         # Logic to handle filename replacement
         if old_filename and new_filename:
             # Save the filename replacement in MongoDB or another persistent storage
-            save_filename_replacement(user_id, old_filename, new_filename)
+            # save_filename_replacement(user_id, old_filename, new_filename)
             return await event.respond(f"Filename replacement saved: '{old_filename}' -> '{new_filename}'")
         else:
             return await event.respond("Invalid filename replacement format.")
