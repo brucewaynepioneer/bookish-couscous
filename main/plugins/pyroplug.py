@@ -1,3 +1,6 @@
+
+
+
 #uwill
 import re
 import asyncio, time, os
@@ -278,6 +281,7 @@ def save_filename_replacements(user_id, filename_replacements):
 # Updated /replace command handler
 ####################################################################
 
+# Updated /replace command handler
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
