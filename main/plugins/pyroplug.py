@@ -1,6 +1,3 @@
-
-
-
 #uwill
 import re
 import asyncio, time, os
@@ -280,6 +277,7 @@ def save_filename_replacements(user_id, filename_replacements):
 ####################################################################
 # Updated /replace command handler
 ####################################################################
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -302,6 +300,7 @@ async def replace_command(event):
         if any(old_word in delete_words for old_word in old_words):
             return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
+        # Use load_word_replacements to load word replacements
         replacements = load_word_replacements(user_id)
         
         # Ensure replacements is a dict before updating
@@ -320,6 +319,7 @@ async def replace_command(event):
     if match_filename:
         old_filename, new_filename = match_filename.groups()
 
+        # Use load_filename_replacements to load filename replacements
         filename_replacements = load_filename_replacements(user_id)
         filename_replacements[old_filename] = new_filename
 
@@ -328,7 +328,7 @@ async def replace_command(event):
         return await event.respond(f"Filename replacement saved: '{old_filename}' -> '{new_filename}'")
     
     return await event.respond("Usage:\nFor word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\n"
-                               "For filename replacement: /replace filename \"OLD_FILENAME\" -> \"NEW_FILENAME\"")  
+                               "For filename replacement: /replace filename \"OLD_FILENAME\" -> \"NEW_FILENAME\"")
 
 
 
