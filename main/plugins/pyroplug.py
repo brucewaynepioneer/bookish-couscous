@@ -1,5 +1,6 @@
 
 
+
 #uwill
 import re
 import asyncio, time, os
@@ -214,47 +215,71 @@ def save_delete_words(user_id, delete_words):
     except Exception as e:
         print(f"Error saving delete words: {e}")
 
-def load_replacement_words(user_id):
+# MongoDB collection names for word and filename replacements
+WORD_REPLACEMENTS_COLLECTION = "word_replacements"
+FILENAME_REPLACEMENTS_COLLECTION = "filename_replacements"
+
+# Establish collections for word and filename replacements
+word_replacements_collection = db[WORD_REPLACEMENTS_COLLECTION]
+filename_replacements_collection = db[FILENAME_REPLACEMENTS_COLLECTION]
+
+####################################################################
+# Functions to handle Word Replacements
+####################################################################
+def load_word_replacements(user_id):
+    """
+    Load word replacements for a specific user from the word_replacements collection in MongoDB
+    """
     try:
-        words_data = collection.find_one({"_id": user_id})
-        if words_data:
-            return words_data.get("replacement_words", {})
-        else:
-            return {}
+        words_data = word_replacements_collection.find_one({"_id": user_id})
+        return words_data.get("replacement_words", {}) if words_data else {}
     except Exception as e:
-        print(f"Error loading replacement words: {e}")
+        print(f"Error loading word replacements: {e}")
         return {}
 
-# Modify the save_replacement_words function to handle filename replacements too
-def save_replacement_words(user_id, replacements, filename_replacements=None):
+def save_word_replacements(user_id, replacements):
+    """
+    Save word replacements for a specific user to the word_replacements collection in MongoDB
+    """
     try:
-        update_data = {"replacement_words": replacements}
-        
-        if filename_replacements:
-            update_data["filename_replacements"] = filename_replacements
-        
-        collection.update_one(
+        word_replacements_collection.update_one(
             {"_id": user_id},
-            {"$set": update_data},
+            {"$set": {"replacement_words": replacements}},
             upsert=True
         )
     except Exception as e:
-        print(f"Error saving replacement words or filenames: {e}")
+        print(f"Error saving word replacements: {e}")
 
-def load_replacement_words(user_id):
+####################################################################
+# Functions to handle Filename Replacements
+####################################################################
+def load_filename_replacements(user_id):
+    """
+    Load filename replacements for a specific user from the filename_replacements collection in MongoDB
+    """
     try:
-        words_data = collection.find_one({"_id": user_id})
-        if words_data:
-            replacements = words_data.get("replacement_words", {})
-            filename_replacements = words_data.get("filename_replacements", {})
-            return replacements, filename_replacements
-        else:
-            return {}, {}  # Ensure it always returns dictionaries
+        words_data = filename_replacements_collection.find_one({"_id": user_id})
+        return words_data.get("filename_replacements", {}) if words_data else {}
     except Exception as e:
-        print(f"Error loading replacement words or filenames: {e}")
-        return {}, {}  # Always return dictionaries
+        print(f"Error loading filename replacements: {e}")
+        return {}
 
+def save_filename_replacements(user_id, filename_replacements):
+    """
+    Save filename replacements for a specific user to the filename_replacements collection in MongoDB
+    """
+    try:
+        filename_replacements_collection.update_one(
+            {"_id": user_id},
+            {"$set": {"filename_replacements": filename_replacements}},
+            upsert=True
+        )
+    except Exception as e:
+        print(f"Error saving filename replacements: {e}")
+
+####################################################################
 # Updated /replace command handler
+####################################################################
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -277,7 +302,7 @@ async def replace_command(event):
         if any(old_word in delete_words for old_word in old_words):
             return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
-        replacements, filename_replacements = load_replacement_words(user_id)
+        replacements = load_word_replacements(user_id)
         
         # Ensure replacements is a dict before updating
         if isinstance(replacements, dict):
@@ -285,7 +310,7 @@ async def replace_command(event):
         else:
             replacements = dict(zip(old_words, new_words))  # Convert to dict if necessary
 
-        save_replacement_words(user_id, replacements, filename_replacements)
+        save_word_replacements(user_id, replacements)
 
         replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
         return await event.respond(f"Replacements saved: {replacement_summary}")
@@ -295,15 +320,15 @@ async def replace_command(event):
     if match_filename:
         old_filename, new_filename = match_filename.groups()
 
-        replacements, filename_replacements = load_replacement_words(user_id)
+        filename_replacements = load_filename_replacements(user_id)
         filename_replacements[old_filename] = new_filename
 
-        save_replacement_words(user_id, replacements, filename_replacements)
+        save_filename_replacements(user_id, filename_replacements)
 
         return await event.respond(f"Filename replacement saved: '{old_filename}' -> '{new_filename}'")
     
     return await event.respond("Usage:\nFor word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\n"
-                               "For filename replacement: /replace filename \"OLD_FILENAME\" -> \"NEW_FILENAME\"")
+                               "For filename replacement: /replace filename \"OLD_FILENAME\" -> \"NEW_FILENAME\"")  
 
 
 
