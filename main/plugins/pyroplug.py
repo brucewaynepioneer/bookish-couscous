@@ -287,7 +287,18 @@ async def replace_command(event):
 
         return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
 
-    # Filename replacement case
+
+
+@bot.on(events.NewMessage(incoming=True, pattern='/replace_file'))
+async def replace_file_command(event):
+    if event.sender_id not in SUPER_USERS:
+        return await event.respond("This command is restricted.")
+    
+    user_id = event.sender_id
+    if not user_id:
+        return await event.respond("User ID not found!")
+    
+    # Regex pattern to match filename replacements
     match_filename = re.match(r'/replace_file\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
     if match_filename:
         old_files = re.findall(r'"([^"]+)"', match_filename.group(1))
@@ -300,7 +311,7 @@ async def replace_command(event):
         if not all(is_valid_filename(f) for f in old_files + new_files):
             return await event.respond("One or more filenames are invalid.")
 
-        # Save filename replacements in MongoDB
+        # Save filename replacements in MongoDB (or your storage)
         file_replacements = dict(zip(old_files, new_files))
         save_replacement_files(user_id, file_replacements)
 
@@ -310,15 +321,14 @@ async def replace_command(event):
 
     return await event.respond(
         "Usage:\n"
-        "For word replacement: /replace \"WORD\" -> \"REPLACEWORD\"\n"
-        "For multiple words: /replace \"WORD1\" \"WORD2\" ... -> \"NEWWORD1\" \"NEWWORD2\" ...\n"
-        "For filenames: /replace_file \"OLD_FILE1\" \"OLD_FILE2\" ... -> \"NEW_FILE1\" \"NEW_FILE2\" ..."
+        "For filename replacement: /replace_file \"OLD_FILE1\" \"OLD_FILE2\" ... -> \"NEW_FILE1\" \"NEW_FILE2\" ..."
     )
 
 # Utility function to check if a filename is valid (e.g., no forbidden characters)
 def is_valid_filename(filename):
     forbidden_chars = r'<>:"/\\|?*'
     return not any(char in filename for char in forbidden_chars)
+
 
 
 
