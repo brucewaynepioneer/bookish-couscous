@@ -289,7 +289,10 @@ async def replace_command(event):
 
 
 
-@bot.on(events.NewMessage(incoming=True, pattern='/replace_file'))
+
+
+# Listen to both `/replace file` and `/replace_file` commands
+@bot.on(events.NewMessage(incoming=True, pattern='/replace_file|/replace file'))
 async def replace_file_command(event):
     if event.sender_id not in SUPER_USERS:
         return await event.respond("This command is restricted.")
@@ -299,35 +302,31 @@ async def replace_file_command(event):
         return await event.respond("User ID not found!")
     
     # Regex pattern to match filename replacements
-    match_filename = re.match(r'/replace_file\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
+    match_filename = re.match(r'/replace(?:_file| file)\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
     if match_filename:
-        old_files = re.findall(r'"([^"]+)"', match_filename.group(1))
-        new_files = re.findall(r'"([^"]+)"', match_filename.group(2))
-
-        if len(old_files) != len(new_files):
-            return await event.respond("The number of old filenames must match the number of new filenames.")
+        old_file, new_file = match_filename.groups()
 
         # Check if filenames are valid
-        if not all(is_valid_filename(f) for f in old_files + new_files):
+        if not is_valid_filename(old_file) or not is_valid_filename(new_file):
             return await event.respond("One or more filenames are invalid.")
 
         # Save filename replacements in MongoDB (or your storage)
-        file_replacements = dict(zip(old_files, new_files))
+        file_replacements = {old_file: new_file}
         save_replacement_files(user_id, file_replacements)
 
         # Response summarizing filename replacements
-        file_replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in file_replacements.items()])
-        return await event.respond(f"Filename replacements saved: {file_replacement_summary}")
+        return await event.respond(f"Filename replacement saved: '{old_file}' will be replaced with '{new_file}'")
 
     return await event.respond(
         "Usage:\n"
-        "For filename replacement: /replace_file \"OLD_FILE1\" \"OLD_FILE2\" ... -> \"NEW_FILE1\" \"NEW_FILE2\" ..."
+        "For filename replacement: /replace_file \"OLD_FILENAME\" -> \"NEW_FILENAME\""
     )
 
 # Utility function to check if a filename is valid (e.g., no forbidden characters)
 def is_valid_filename(filename):
     forbidden_chars = r'<>:"/\\|?*'
     return not any(char in filename for char in forbidden_chars)
+
 
 
 
