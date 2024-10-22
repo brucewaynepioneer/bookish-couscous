@@ -294,7 +294,6 @@ async def replace_command(event):
 
 
 
-
 @bot.on(events.NewMessage(incoming=True, pattern='/replace_file|/replace file'))
 async def replace_file_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -303,21 +302,26 @@ async def replace_file_command(event):
     user_id = event.sender_id
     if not user_id:
         return await event.respond("User ID not found!")
-    
-    # Regex pattern to match filename replacements
+
+    # Debug: Log the input message
+    print(f"Raw text: {event.raw_text}")
+
+    # Regex to match filename replacements
     match_filename = re.match(r'/replace(?:_file| file)\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
+
     if match_filename:
         old_file, new_file = match_filename.groups()
+        # Debug: Check what filenames are captured
+        print(f"Matched filenames: old={old_file}, new={new_file}")
 
-        # Check if filenames are valid
+        # Validate filenames
         if not is_valid_filename(old_file) or not is_valid_filename(new_file):
             return await event.respond("One or more filenames are invalid.")
 
-        # Save filename replacements in MongoDB
+        # Save filename replacements
         file_replacements = {old_file: new_file}
         save_replacement_files(user_id, file_replacements)
 
-        # Response summarizing filename replacements
         return await event.respond(f"Filename replacement saved: '{old_file}' will be replaced with '{new_file}'")
 
     return await event.respond(
@@ -325,32 +329,23 @@ async def replace_file_command(event):
         "For filename replacement: /replace_file \"OLD_FILENAME\" -> \"NEW_FILENAME\""
     )
 
-# Utility function to check if a filename is valid (e.g., no forbidden characters)
 def is_valid_filename(filename):
     forbidden_chars = r'<>:"/\\|?*'
     return not any(char in filename for char in forbidden_chars)
 
 def save_replacement_files(user_id, file_replacements):
-    """
-    Save the user's filename replacements to the database.
-    This function stores the replacements in MongoDB.
-    
-    Parameters:
-    - user_id: The ID of the user making the replacement
-    - file_replacements: A dictionary of old_filename -> new_filename pairs
-    """
-    # Prepare the document to be inserted or updated
     document = {
         'user_id': user_id,
         'file_replacements': file_replacements
     }
-    
-    # Insert the replacement into the collection, upserting (insert or update) based on user_id
     file_replacements_collection.update_one(
-        {'user_id': user_id},  # Query by user_id
-        {'$set': document},    # Update or set the new replacements
-        upsert=True            # Insert if the document doesn't exist
+        {'user_id': user_id},
+        {'$set': document},
+        upsert=True
     )
+    # Debug: Log the saved replacements
+    print(f"Saved replacements for user {user_id}: {file_replacements}")
+
 
 
 
