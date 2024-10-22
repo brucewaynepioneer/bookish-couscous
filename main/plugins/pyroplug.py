@@ -34,6 +34,7 @@ MONGODB_CONNECTION_STRING = config("MONGODB")
 mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 db = mongo_client[DB_NAME]
 collection = db[COLLECTION_NAME]
+file_replacements_collection = db['file_replacements']
 
 def load_authorized_users():
     """
@@ -236,8 +237,7 @@ def save_replacement_words(user_id, replacements):
 
 
 
-import re
-from telethon import events
+
 
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
@@ -291,7 +291,10 @@ async def replace_command(event):
 
 
 
-# Listen to both `/replace file` and `/replace_file` commands
+
+
+
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace_file|/replace file'))
 async def replace_file_command(event):
     if event.sender_id not in SUPER_USERS:
@@ -310,7 +313,7 @@ async def replace_file_command(event):
         if not is_valid_filename(old_file) or not is_valid_filename(new_file):
             return await event.respond("One or more filenames are invalid.")
 
-        # Save filename replacements in MongoDB (or your storage)
+        # Save filename replacements in MongoDB
         file_replacements = {old_file: new_file}
         save_replacement_files(user_id, file_replacements)
 
@@ -326,6 +329,28 @@ async def replace_file_command(event):
 def is_valid_filename(filename):
     forbidden_chars = r'<>:"/\\|?*'
     return not any(char in filename for char in forbidden_chars)
+
+def save_replacement_files(user_id, file_replacements):
+    """
+    Save the user's filename replacements to the database.
+    This function stores the replacements in MongoDB.
+    
+    Parameters:
+    - user_id: The ID of the user making the replacement
+    - file_replacements: A dictionary of old_filename -> new_filename pairs
+    """
+    # Prepare the document to be inserted or updated
+    document = {
+        'user_id': user_id,
+        'file_replacements': file_replacements
+    }
+    
+    # Insert the replacement into the collection, upserting (insert or update) based on user_id
+    file_replacements_collection.update_one(
+        {'user_id': user_id},  # Query by user_id
+        {'$set': document},    # Update or set the new replacements
+        upsert=True            # Insert if the document doesn't exist
+    )
 
 
 
