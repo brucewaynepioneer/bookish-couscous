@@ -199,21 +199,41 @@ def load_delete_words(user_id):
         print(f"Error loading delete words: {e}")
         return set()
 
-def save_delete_words(user_id, delete_words):
-    """
-    Save delete words for a specific user to MongoDB
-    """
+import logging
+import pymongo
+from decouple import config
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logging.getLogger("pyrogram").setLevel(logging.INFO)
+logging.getLogger("telethon").setLevel(logging.INFO)
+
+# MongoDB database and collection configuration
+DB_NAME = "smart_users"
+COLLECTION_NAME = "super_user"
+MONGODB_CONNECTION_STRING = config("MONGODB")  # Load from environment or config file
+
+# Establish MongoDB connection
+mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+db = mongo_client[DB_NAME]
+collection = db[COLLECTION_NAME]
+
+logger.info("Connected to MongoDB database: %s, collection: %s", DB_NAME, COLLECTION_NAME)
+
+# Function to load replacement words from MongoDB
+def load_replacement_words(user_id):
     try:
-        collection.update_one(
-            {"_id": user_id},
-            {"$set": {"delete_words": list(delete_words)}},
-            upsert=True
-        )
+        user_data = collection.find_one({"user_id": user_id})
+        if user_data and "replacements" in user_data:
+            return user_data["replacements"]
+        return {}
     except Exception as e:
-        print(f"Error saving delete words: {e}")
+        logger.error("Error loading replacements for user %s: %s", user_id, e)
+        return {}
 
-
-# Function to save replacement words
+# Function to save replacement words into MongoDB
 def save_replacement_words(user_id, replacements):
     try:
         collection.update_one({"user_id": user_id}, {"$set": {"replacements": replacements}}, upsert=True)
@@ -230,6 +250,7 @@ async def handle_filename_replacement(event, old_filename, new_filename, documen
     except Exception as e:
         logger.error("Failed to send document with filename replacement: %s", e)
         await event.respond(f"Error sending document: {e}")
+
 
 
 
