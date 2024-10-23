@@ -14,11 +14,14 @@ from pyrogram.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
 from telethon import events
 import logging
+from pymongo.errors import ConnectionError, ConfigurationError
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Set specific logging levels for third-party libraries
 logging.getLogger("pyrogram").setLevel(logging.INFO)
 logging.getLogger("telethon").setLevel(logging.INFO)
 
@@ -26,15 +29,25 @@ logging.getLogger("telethon").setLevel(logging.INFO)
 DB_NAME = "smart_users"
 COLLECTION_NAME = "super_user"
 
-# Use the MongoDB connection string (MONGODB) from __init__.py
-# MONGODB_CONNECTION_STRING = MONGODB
-MONGODB_CONNECTION_STRING = config("MONGODB")
+# Use the MongoDB connection string (MONGODB) from the environment or config
+MONGODB_CONNECTION_STRING = config("MONGODB")  # Ensure this comes from the right source (env or __init__.py)
 
-# Establish a connection to MongoDB using the connection string from __init__.py
-mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
-db = mongo_client[DB_NAME]
-collection = db[COLLECTION_NAME]
-file_replacements_collection = db['file_replacements']
+# Establish a connection to MongoDB using the connection string
+try:
+    mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+    db = mongo_client[DB_NAME]
+    
+    # Access the collections
+    collection = db[COLLECTION_NAME]  # Main collection for super users
+    file_replacements_collection = db['file_replacements']  # Collection for file replacements
+    
+    # Log successful connection
+    logger.info(f"Successfully connected to MongoDB database: {DB_NAME}")
+
+except (ConnectionError, ConfigurationError) as e:
+    logger.error(f"Error connecting to MongoDB: {e}")
+    raise  # Optionally re-raise the exception or handle it as needed
+
 
 def load_authorized_users():
     """
@@ -237,64 +250,34 @@ def save_replacement_words(user_id, replacements):
 
 
 
+# Helper function to validate filenames or full paths
+def is_valid_filename(filename):
+    forbidden_chars = r'<>:"/\\|?*'
+    try:
+        # Ensure the filename or path does not contain forbidden characters
+        return not any(char in filename for char in forbidden_chars)
+    except Exception as e:
+        logger.error(f"Error validating filename: {e}")
+        return False
 
+# Save the file replacements to the database (with error handling)
+def save_replacement_files(user_id, file_replacements):
+    try:
+        document = {
+            'user_id': user_id,
+            'file_replacements': file_replacements
+        }
+        file_replacements_collection.update_one(
+            {'user_id': user_id},
+            {'$set': document},
+            upsert=True
+        )
+        logger.info(f"Saved replacements for user {user_id}: {file_replacements}")
+    except Exception as e:
+        logger.error(f"Error saving file replacements for user {user_id}: {e}")
 
-@bot.on(events.NewMessage(incoming=True, pattern='/replace'))
-async def replace_command(event):
-    if event.sender_id not in SUPER_USERS:
-        return await event.respond("This command is restricted.")
-    
-    user_id = event.sender_id
-    if not user_id:
-        return await event.respond("User ID not found!")
-
-    # Updated regex to handle any number of word replacements
-    match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
-    if match:
-        old_words = re.findall(r'"([^"]+)"', match.group(1))
-        new_words = re.findall(r'"([^"]+)"', match.group(2))
-
-        if len(old_words) != len(new_words):
-            return await event.respond("The number of words/phrases to replace must match the number of new words/phrases.")
-
-        # Load delete words for the user
-        delete_words = load_delete_words(user_id)
-
-        if any(old_word in delete_words for old_word in old_words):
-            return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
-
-        # Save word replacements in MongoDB
-        replacements = dict(zip(old_words, new_words))
-        save_replacement_words(user_id, replacements)
-
-        # Response summarizing replacements
-        replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
-        return await event.respond(f"Replacements saved: {replacement_summary}")
-
-    # Single word replacement case
-    match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
-    if match_single:
-        old_word, new_word = match_single.groups()
-
-        # Load delete words for the user
-        delete_words = load_delete_words(user_id)
-        if old_word in delete_words:
-            return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
-
-        # Save the replacement in MongoDB
-        replacements = {old_word: new_word}
-        save_replacement_words(user_id, replacements)
-
-        return await event.respond(f"Replacement saved: '{old_word}' will be replaced with '{new_word}'")
-
-
-
-
-
-
-
-
-@bot.on(events.NewMessage(incoming=True, pattern='/replace_file|/replace file'))
+# Event handler for /replace_file and /replace file
+@bot.on(events.NewMessage(incoming=True, pattern=r'/replace(_file| file)'))
 async def replace_file_command(event):
     if event.sender_id not in SUPER_USERS:
         return await event.respond("This command is restricted.")
@@ -303,48 +286,34 @@ async def replace_file_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Debug: Log the input message
-    print(f"Raw text: {event.raw_text}")
+    logger.info(f"Raw text: {event.raw_text}")
 
-    # Regex to match filename replacements
+    # Regex to match filename or full path replacements
     match_filename = re.match(r'/replace(?:_file| file)\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
 
     if match_filename:
         old_file, new_file = match_filename.groups()
-        # Debug: Check what filenames are captured
-        print(f"Matched filenames: old={old_file}, new={new_file}")
+        logger.info(f"Matched filenames: old={old_file}, new={new_file}")
 
-        # Validate filenames
+        # Validate filenames or full paths
         if not is_valid_filename(old_file) or not is_valid_filename(new_file):
-            return await event.respond("One or more filenames are invalid.")
+            return await event.respond("One or more filenames or paths are invalid.")
+        
+        # Ensure paths are normalized
+        old_file = os.path.normpath(old_file)
+        new_file = os.path.normpath(new_file)
 
         # Save filename replacements
         file_replacements = {old_file: new_file}
         save_replacement_files(user_id, file_replacements)
 
         return await event.respond(f"Filename replacement saved: '{old_file}' will be replaced with '{new_file}'")
-
+    
+    # Invalid usage prompt
     return await event.respond(
         "Usage:\n"
         "For filename replacement: /replace_file \"OLD_FILENAME\" -> \"NEW_FILENAME\""
     )
-
-def is_valid_filename(filename):
-    forbidden_chars = r'<>:"/\\|?*'
-    return not any(char in filename for char in forbidden_chars)
-
-def save_replacement_files(user_id, file_replacements):
-    document = {
-        'user_id': user_id,
-        'file_replacements': file_replacements
-    }
-    file_replacements_collection.update_one(
-        {'user_id': user_id},
-        {'$set': document},
-        upsert=True
-    )
-    # Debug: Log the saved replacements
-    print(f"Saved replacements for user {user_id}: {file_replacements}")
 
 
 
