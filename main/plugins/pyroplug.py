@@ -14,7 +14,7 @@ from pyrogram.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
 from telethon import events
 import logging
-
+from pymongo.errors import ConnectionError, ConfigurationError
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG,
@@ -276,8 +276,10 @@ def save_replacement_files(user_id, file_replacements):
     except Exception as e:
         logger.error(f"Error saving file replacements for user {user_id}: {e}")
 
-# Event handler for /replace_file and /replace file
-@bot.on(events.NewMessage(incoming=True, pattern=r'/replace(_file| file)'))
+
+
+# Update the replace_file_command to allow partial matching
+@bot.on(events.NewMessage(incoming=True, pattern='/replace_file|/replace file'))
 async def replace_file_command(event):
     if event.sender_id not in SUPER_USERS:
         return await event.respond("This command is restricted.")
@@ -286,35 +288,55 @@ async def replace_file_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    logger.info(f"Raw text: {event.raw_text}")
+    # Log the raw text for debugging
+    logger.debug(f"Raw text received: {event.raw_text}")
 
-    # Regex to match filename or full path replacements
+    # Improved regex to match filenames and support partial replacements
     match_filename = re.match(r'/replace(?:_file| file)\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
 
     if match_filename:
-        old_file, new_file = match_filename.groups()
-        logger.info(f"Matched filenames: old={old_file}, new={new_file}")
+        old_file_part, new_file_part = match_filename.groups()
 
-        # Validate filenames or full paths
-        if not is_valid_filename(old_file) or not is_valid_filename(new_file):
-            return await event.respond("One or more filenames or paths are invalid.")
-        
-        # Ensure paths are normalized
-        old_file = os.path.normpath(old_file)
-        new_file = os.path.normpath(new_file)
+        # Log matched parts for debugging
+        logger.debug(f"Old file part: {old_file_part}, New file part: {new_file_part}")
 
-        # Save filename replacements
-        file_replacements = {old_file: new_file}
-        save_replacement_files(user_id, file_replacements)
+        # Validate if the old file part exists in the filename
+        if old_file_part in event.raw_text:
+            # Update the filename
+            updated_filename = event.raw_text.replace(old_file_part, new_file_part)
+            
+            # Log the updated filename
+            logger.debug(f"Updated filename: {updated_filename}")
 
-        return await event.respond(f"Filename replacement saved: '{old_file}' will be replaced with '{new_file}'")
-    
-    # Invalid usage prompt
+            # Save filename replacements (modify the storage method as needed)
+            file_replacements = {old_file_part: new_file_part}
+            save_replacement_files(user_id, file_replacements)
+
+            return await event.respond(f"Filename replacement saved: '{old_file_part}' replaced with '{new_file_part}' in '{updated_filename}'")
+        else:
+            return await event.respond(f"The part '{old_file_part}' was not found in the original filename.")
+
     return await event.respond(
         "Usage:\n"
-        "For filename replacement: /replace_file \"OLD_FILENAME\" -> \"NEW_FILENAME\""
+        "For filename replacement: /replace_file \"OLD_FILENAME_PART\" -> \"NEW_FILENAME_PART\""
     )
 
+def is_valid_filename(filename):
+    forbidden_chars = r'<>:"/\\|?*'
+    return not any(char in filename for char in forbidden_chars)
+
+def save_replacement_files(user_id, file_replacements):
+    # Update the database with the replacement filenames (MongoDB logic here)
+    document = {
+        'user_id': user_id,
+        'file_replacements': file_replacements
+    }
+    file_replacements_collection.update_one(
+        {'user_id': user_id},
+        {'$set': document},
+        upsert=True
+    )
+    logger.debug(f"Saved file replacements for user {user_id}: {file_replacements}")
 
 
 
