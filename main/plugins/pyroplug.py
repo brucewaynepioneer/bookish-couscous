@@ -14,7 +14,7 @@ from pyrogram.raw.functions.channels import GetMessages
 from main.plugins.helpers import video_metadata
 from telethon import events
 import logging
-from pymongo.errors import ConnectionError, ConfigurationError
+
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG,
