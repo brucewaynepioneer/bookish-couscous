@@ -236,6 +236,29 @@ def save_replacement_words(user_id, replacements):
 
 
 
+
+def save_replacement_words(user_id, replacements, replacement_type="caption"):
+    """
+    Save replacements for the specified user in the database, either as captions or filenames.
+    
+    Args:
+        user_id (int): The user ID to store replacements for.
+        replacements (dict): A dictionary where keys are old words, and values are new words.
+        replacement_type (str): The type of replacement, "caption" or "filename".
+    """
+    # Update or insert the replacement dictionary for the user and type
+    collection.update_one(
+        {'user_id': user_id, 'type': replacement_type},
+        {'$set': {'replacements': replacements}},
+        upsert=True
+    )
+
+# Wrapper function for saving filename replacements, reusing `save_replacement_words`
+def save_filename_replacement_words(user_id, replacements):
+    save_replacement_words(user_id, replacements, replacement_type="filename")
+
+
+
 @bot.on(events.NewMessage(incoming=True, pattern='/replace'))
 async def replace_command(event):
     if event.sender_id not in SUPER_USERS:
