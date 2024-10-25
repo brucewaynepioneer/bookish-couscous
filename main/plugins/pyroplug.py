@@ -245,54 +245,68 @@ async def replace_command(event):
     if not user_id:
         return await event.respond("User ID not found!")
 
-    # Updated regex to handle any number of word and/or filename replacements
-    match = re.match(r'/replace\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', event.raw_text, re.UNICODE)
+    # Determine whether it's for captions or filenames based on input pattern
+    command_text = event.raw_text
+    is_filename = "/filename" in command_text
+
+    # Updated regex to handle any number of word replacements
+    match = re.match(r'/replace(?:\s+/filename)?\s+((?:\"[^\"]+\"\s*)+)\s*->\s+((?:\"[^\"]+\"\s*)+)', command_text, re.UNICODE)
     if match:
-        # Extract old words/filenames and new words/filenames from the input command
-        old_entries = re.findall(r'"([^"]+)"', match.group(1))
-        new_entries = re.findall(r'"([^"]+)"', match.group(2))
+        # Extract old words and new words from the input command
+        old_words = re.findall(r'"([^"]+)"', match.group(1))
+        new_words = re.findall(r'"([^"]+)"', match.group(2))
 
-        # Ensure that the number of old entries matches the number of new entries
-        if len(old_entries) != len(new_entries):
-            return await event.respond("The number of old entries must match the number of new entries.")
+        # Ensure that the number of old words matches the number of new words
+        if len(old_words) != len(new_words):
+            return await event.respond("The number of words/phrases to replace must match the number of new words/phrases.")
 
-        # Load delete words and filenames for the user
+        # Load delete words for the user
         delete_words = load_delete_words(user_id)
-        delete_filenames = load_delete_filenames(user_id)  # Assuming a function to load restricted filenames
+        
+        # Check if any of the old words are in the delete list
+        if any(old_word in delete_words for old_word in old_words):
+            return await event.respond("One or more words in the old words list are in the delete set and cannot be replaced.")
 
-        # Check if any of the old words/filenames are in the delete list
-        if any(old_entry in delete_words for old_entry in old_entries) or \
-           any(old_entry in delete_filenames for old_entry in old_entries):
-            return await event.respond("One or more words or filenames in the old list are restricted and cannot be replaced.")
-
-        # Save the replacements in MongoDB (word/filename replacements)
-        replacements = dict(zip(old_entries, new_entries))
-        save_replacement_words(user_id, replacements)  # Assuming it handles both words and filenames
+        # Save the replacements in MongoDB based on command type (caption or filename)
+        replacements = dict(zip(old_words, new_words))
+        if is_filename:
+            save_filename_replacement_words(user_id, replacements)
+        else:
+            save_replacement_words(user_id, replacements)
 
         # Create the response showing the replacements made
         replacement_summary = ', '.join([f"'{old}' -> '{new}'" for old, new in replacements.items()])
-        return await event.respond(f"Replacements saved: {replacement_summary}")
+        response_type = "Filename" if is_filename else "Caption"
+        return await event.respond(f"{response_type} replacements saved: {replacement_summary}")
     
-    # Regex for single word/filename replacement
-    match_single = re.match(r'/replace\s+"([^"]+)"\s*->\s*"([^"]+)"', event.raw_text, re.UNICODE)
+    # Regex for single word replacement
+    match_single = re.match(r'/replace(?:\s+/filename)?\s+"([^"]+)"\s*->\s*"([^"]+)"', command_text, re.UNICODE)
     if match_single:
-        old_entry, new_entry = match_single.groups()
+        old_word, new_word = match_single.groups()
 
-        # Load delete words and filenames for the user
+        # Load delete words for the user
         delete_words = load_delete_words(user_id)
-        delete_filenames = load_delete_filenames(user_id)
+        if old_word in delete_words:
+            return await event.respond(f"The word '{old_word}' is in the delete set and cannot be replaced.")
 
-        if old_entry in delete_words or old_entry in delete_filenames:
-            return await event.respond(f"The entry '{old_entry}' is restricted and cannot be replaced.")
+        # Save the replacement in MongoDB based on command type (caption or filename)
+        replacements = {old_word: new_word}
+        if is_filename:
+            save_filename_replacement_words(user_id, replacements)
+        else:
+            save_replacement_words(user_id, replacements)
 
-        # Save the replacement in MongoDB
-        replacements = {old_entry: new_entry}
-        save_replacement_words(user_id, replacements)
-
-        return await event.respond(f"Replacement saved: '{old_entry}' will be replaced with '{new_entry}'")
+        response_type = "Filename" if is_filename else "Caption"
+        return await event.respond(f"{response_type} replacement saved: '{old_word}' will be replaced with '{new_word}'")
     
     # If no valid command format is found
-    return await event.respond("Usage:\nFor single word/filename replacement: /replace \"WORD/FILENAME\" -> \"REPLACEMENT\"\nFor multiple replacements: /replace \"WORD1/FILENAME1\" \"WORD2/FILENAME2\" ... -> \"NEWWORD1/NEWFILENAME1\" \"NEWWORD2/NEWFILENAME2\" ...")  
+    return await event.respond(
+        "Usage:\n"
+        "For single word caption replacement: /replace \"WORD\" -> \"REPLACEWORD\"\n"
+        "For multiple word caption replacements: /replace \"WORD1\" \"WORD2\" ... -> \"NEWWORD1\" \"NEWWORD2\" ...\n"
+        "For single word filename replacement: /replace /filename \"WORD\" -> \"REPLACEWORD\"\n"
+        "For multiple word filename replacements: /replace /filename \"WORD1\" \"WORD2\" ... -> \"NEWWORD1\" \"NEWWORD2\" ..."
+    )
 
 
 
