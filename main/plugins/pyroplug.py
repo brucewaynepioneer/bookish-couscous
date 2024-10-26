@@ -53,6 +53,28 @@ def save_authorized_users(authorized_users):
     for user_id in authorized_users:
         collection.insert_one({"user_id": user_id})
 
+
+# Function to delete all data from the collection
+def delete_all_data():
+    """
+    Delete all documents from the MongoDB collection
+    """
+    collection.delete_many({})
+
+# Command handler to delete all data from MongoDB
+@Client.on_message(filters.command("delall") & filters.user(SUPER_USERS))
+async def handle_delete_all_data(client: Client, message: Message):
+    """
+    Handle /delall command to clear the MongoDB collection.
+    Only accessible by SUPER_USERS.
+    """
+    try:
+        delete_all_data()
+        await message.reply_text("All data has been successfully deleted from the database.")
+    except Exception as e:
+        await message.reply_text(f"An error occurred while deleting data: {str(e)}")
+
+
 SUPER_USERS = load_authorized_users()
 
 # Define a dictionary to store user chat IDs
