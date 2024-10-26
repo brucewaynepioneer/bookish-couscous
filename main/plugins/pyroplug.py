@@ -22,15 +22,12 @@ logger = logging.getLogger(__name__)
 logging.getLogger("pyrogram").setLevel(logging.INFO)
 logging.getLogger("telethon").setLevel(logging.INFO)
 
-# MongoDB database name and collection name
+
+# MongoDB setup
 DB_NAME = "smart_users"
 COLLECTION_NAME = "super_user"
-
-# Use the MongoDB connection string (MONGODB) from __init__.py
-# MONGODB_CONNECTION_STRING = MONGODB
 MONGODB_CONNECTION_STRING = config("MONGODB")
 
-# Establish a connection to MongoDB using the connection string from __init__.py
 mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 db = mongo_client[DB_NAME]
 collection = db[COLLECTION_NAME]
@@ -44,6 +41,27 @@ def load_authorized_users():
         if "user_id" in user_doc:
             authorized_users.add(user_doc["user_id"])
     return authorized_users
+
+SUPER_USERS = list(load_authorized_users())  # Convert set to list for filters.user compatibility
+
+def delete_all_data():
+    """
+    Delete all documents from the MongoDB collection
+    """
+    collection.delete_many({})
+
+@Client.on_message(filters.command("delall") & filters.user(SUPER_USERS))
+async def handle_delete_all_data(client: Client, message: Message):
+    """
+    Handle /delall command to clear the MongoDB collection.
+    Only accessible by SUPER_USERS.
+    """
+    try:
+        delete_all_data()  # Call function to delete all documents
+        await message.reply_text("All messages have been successfully deleted from the database.")
+    except Exception as e:
+        await message.reply_text(f"An error occurred while deleting messages: {str(e)}")
+
 
 def save_authorized_users(authorized_users):
     """
