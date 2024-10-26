@@ -51,8 +51,6 @@ def save_authorized_users(authorized_users):
     for user_id in authorized_users:
         collection.insert_one({"user_id": user_id})
 
-# Load SUPER_USERS before defining the command handler
-SUPER_USERS = load_authorized_users()
 
 # Function to delete all data from the collection
 def delete_all_data():
@@ -60,6 +58,9 @@ def delete_all_data():
     Delete all documents from the MongoDB collection
     """
     collection.delete_many({})
+
+# Convert SUPER_USERS to a list for use in filters.user
+SUPER_USERS = list(load_authorized_users())
 
 # Command handler to delete all data from MongoDB
 @Client.on_message(filters.command("delall") & filters.user(SUPER_USERS))
