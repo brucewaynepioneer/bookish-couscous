@@ -1,5 +1,4 @@
 
-#uwill
 import re
 import asyncio, time, os
 import pymongo
@@ -27,7 +26,6 @@ DB_NAME = "smart_users"
 COLLECTION_NAME = "super_user"
 
 # Use the MongoDB connection string (MONGODB) from __init__.py
-# MONGODB_CONNECTION_STRING = MONGODB
 MONGODB_CONNECTION_STRING = config("MONGODB")
 
 # Establish a connection to MongoDB using the connection string from __init__.py
@@ -53,6 +51,8 @@ def save_authorized_users(authorized_users):
     for user_id in authorized_users:
         collection.insert_one({"user_id": user_id})
 
+# Load SUPER_USERS before defining the command handler
+SUPER_USERS = load_authorized_users()
 
 # Function to delete all data from the collection
 def delete_all_data():
@@ -63,7 +63,7 @@ def delete_all_data():
 
 # Command handler to delete all data from MongoDB
 @Client.on_message(filters.command("delall") & filters.user(SUPER_USERS))
-async def handle_delete_all_data(client: Client, message: Message):
+async def handle_delete_all_data(client: Client, message):
     """
     Handle /delall command to clear the MongoDB collection.
     Only accessible by SUPER_USERS.
@@ -74,8 +74,6 @@ async def handle_delete_all_data(client: Client, message: Message):
     except Exception as e:
         await message.reply_text(f"An error occurred while deleting data: {str(e)}")
 
-
-SUPER_USERS = load_authorized_users()
 
 # Define a dictionary to store user chat IDs
 user_chat_ids = {}
