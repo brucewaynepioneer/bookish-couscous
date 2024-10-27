@@ -53,7 +53,20 @@ def save_authorized_users(authorized_users):
     for user_id in authorized_users:
         collection.insert_one({"user_id": user_id})
 
-SUPER_USERS = load_authorized_users()
+def delete_all_users():
+    """
+    Delete all documents from the MongoDB collection.
+    
+    Raises:
+        Exception: If there is an issue deleting documents.
+    """
+    try:
+        result = collection.delete_many({})
+        print(f"Deleted {result.deleted_count} documents from the collection.")
+    except Exception as e:
+        print(f"An error occurred while deleting documents: {e}")
+        raise  # Re-raise the exception after logging it
+
 
 # Define a dictionary to store user chat IDs
 user_chat_ids = {}
