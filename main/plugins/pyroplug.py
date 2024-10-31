@@ -327,10 +327,11 @@ async def replace_command(event):
 
 
 
+
 @bot.on(events.NewMessage(incoming=True, pattern='/auth'))
 async def _auth(event):
     """
-    Command to authorize users for a limited time.
+    Command to authorize users for a limited time with user notification.
     """
     if event.sender_id == OWNER_ID:
         # Parse user ID and duration
@@ -338,24 +339,28 @@ async def _auth(event):
             command_parts = event.message.text.split()
             user_id = int(command_parts[1])
             
-            # Parse the duration (e.g., 30d for 30 days)
+            # Parse the duration (e.g., 7d for 7 days)
             duration_value = int(command_parts[2][:-1])
             time_unit = command_parts[2][-1]
 
             # Calculate expiration time based on time unit
-            if time_unit == 'm':  # minutes
+            if time_unit in ['m', 'minute', 'minutes']:
                 expires_at = datetime.now() + timedelta(minutes=duration_value)
-            elif time_unit == 'h':  # hours
+                unit_name = "minutes"
+            elif time_unit in ['h', 'hour', 'hours']:
                 expires_at = datetime.now() + timedelta(hours=duration_value)
-            elif time_unit == 'd':  # days
+                unit_name = "hours"
+            elif time_unit in ['d', 'day', 'days']:
                 expires_at = datetime.now() + timedelta(days=duration_value)
-            elif time_unit == 'w':  # weeks
+                unit_name = "days"
+            elif time_unit in ['w', 'week', 'weeks']:
                 expires_at = datetime.now() + timedelta(weeks=duration_value)
+                unit_name = "weeks"
             else:
-                return await event.respond("Invalid time format. Use m, h, d, or w for minutes, hours, days, or weeks.")
-            
+                return await event.respond("Invalid time format. Use m, h, d, or w.")
+
         except (ValueError, IndexError):
-            return await event.respond("Invalid /auth command. Use /auth USER_ID DURATION (e.g., /auth 12345 30d).")
+            return await event.respond("Invalid /auth command. Use /auth USER_ID DURATION (e.g., /auth 12345 7d).")
 
         # Save to MongoDB
         collection.update_one(
@@ -363,7 +368,27 @@ async def _auth(event):
             {"$set": {"expires_at": expires_at}},
             upsert=True
         )
-        await event.respond(f"User {user_id} has been authorized for {duration_value}{time_unit}.")
+
+        # Calculate duration in a human-readable format
+        time_left = expires_at - datetime.now()
+        days, seconds = time_left.days, time_left.seconds
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+
+        # Generate a readable duration message
+        duration_message = []
+        if days > 0:
+            duration_message.append(f"{days} day(s)")
+        if hours > 0:
+            duration_message.append(f"{hours} hour(s)")
+        if minutes > 0:
+            duration_message.append(f"{minutes} minute(s)")
+
+        duration_text = ", ".join(duration_message)
+
+        # Notify the user about authorization duration
+        await event.respond(f"User {user_id} has been authorized for {duration_text}. Authorization expires at {expires_at}.")
+
     else:
         await event.respond("You are not authorized to use this command.")
 
