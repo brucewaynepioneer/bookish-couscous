@@ -1,7 +1,8 @@
 
-
 #uwill
 import re
+import datetime
+import pytz
 import asyncio, time, os
 import pymongo
 from decouple import config
@@ -36,25 +37,46 @@ mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 db = mongo_client[DB_NAME]
 collection = db[COLLECTION_NAME]
 
+
+
 def load_authorized_users():
     """
-    Load authorized user IDs from the MongoDB collection
+    Load authorized user IDs from the MongoDB collection.
     """
     authorized_users = set()
-    for user_doc in collection.find():
-        if "user_id" in user_doc:
-            authorized_users.add(user_doc["user_id"])
+    try:
+        for user_doc in collection.find({}, {"user_id": 1}):
+            if "user_id" in user_doc:
+                authorized_users.add(user_doc["user_id"])
+    except Exception as e:
+        print(f"Error loading authorized users: {e}")
     return authorized_users
 
 def save_authorized_users(authorized_users):
     """
-    Save authorized user IDs to the MongoDB collection
+    Save authorized user IDs to the MongoDB collection.
     """
-    collection.delete_many({})
-    for user_id in authorized_users:
-        collection.insert_one({"user_id": user_id})
+    try:
+        collection.delete_many({})
+        collection.insert_many([{"user_id": user_id} for user_id in authorized_users])
+    except Exception as e:
+        print(f"Error saving authorized users: {e}")
 
-SUPER_USERS = load_authorized_users()
+
+def delete_all_users():
+    """
+    Delete all documents from the MongoDB collection.
+    
+    Raises:
+        Exception: If there is an issue deleting documents.
+    """
+    try:
+        result = collection.delete_many({})
+        print(f"Deleted {result.deleted_count} documents from the collection.")
+    except Exception as e:
+        print(f"An error occurred while deleting documents: {e}")
+        raise  # Re-raise the exception after logging it
+
 
 # Define a dictionary to store user chat IDs
 user_chat_ids = {}
@@ -298,25 +320,78 @@ async def replace_command(event):
     ##-----------------------------------------------##
     
     
+
+
+# Load existing authorizations on startup
+SUPER_USERS.update(load_authorized_users())
+
+def parse_time_units(time_units):
+    """
+    Parse time units from a list of strings and return a timedelta.
+    E.g., ["1 day", "2 hours"] returns timedelta(days=1, hours=2).
+    """
+    time_kwargs = {}
+    for unit in time_units:
+        if "day" in unit:
+            time_kwargs["days"] = int(re.search(r"\d+", unit).group())
+        elif "hour" in unit:
+            time_kwargs["hours"] = int(re.search(r"\d+", unit).group())
+        elif "minute" in unit:
+            time_kwargs["minutes"] = int(re.search(r"\d+", unit).group())
+        elif "month" in unit:
+            # Approximate months as 30 days
+            time_kwargs["days"] = int(re.search(r"\d+", unit).group()) * 30
+    return datetime.timedelta(**time_kwargs)
+
 @bot.on(events.NewMessage(incoming=True, pattern='/auth'))
 async def _auth(event):
     """
-    Command to authorize users
+    Command to authorize users with custom time-based expiration.
+    Syntax: /auth USER_ID [time_units] (e.g., /auth USER_ID 1 day 2 hours)
     """
-    # Check if the command is initiated by the owner
     if event.sender_id == OWNER_ID:
-        # Parse the user ID from the command
         try:
-            user_id = int(event.message.text.split(' ')[1])
+            # Parse the user ID and time units
+            parts = event.message.text.split()
+            user_id = int(parts[1])
+            time_units = parts[2:]  # Remaining parts are the time units
+            
+            # Calculate expiration datetime in IST
+            expiration_delta = parse_time_units(time_units)
+            expiration_datetime = datetime.datetime.now(IST) + expiration_delta
+            
+            # Add user with expiration to SUPER_USERS dictionary
+            SUPER_USERS[user_id] = expiration_datetime.timestamp()
+            save_authorized_users(SUPER_USERS)
+            await event.respond(f"User {user_id} has been authorized until {expiration_datetime.astimezone(IST)} IST.")
+        
         except (ValueError, IndexError):
-            return await event.respond("Invalid /auth command. Use /auth USER_ID.")
-
-        #Add the user ID to the authorized set
-        SUPER_USERS.add(user_id)
-        save_authorized_users(SUPER_USERS)
-        await event.respond(f"User {user_id} has been authorized for commands.")
+            await event.respond("Invalid command. Use: /auth USER_ID [time units] (e.g., /auth USER_ID 1 day 2 hours)")
     else:
         await event.respond("You are not authorized to use this command.")
+
+@bot.on(events.NewMessage)
+async def check_authorization(event):
+    """
+    Middleware to check if a user is authorized and if their authorization has expired.
+    """
+    current_timestamp = datetime.datetime.now(IST).timestamp()
+    user_id = event.sender_id
+    
+    # Remove expired users
+    if user_id in SUPER_USERS:
+        if current_timestamp > SUPER_USERS[user_id]:  # Check if the timestamp is past expiration
+            del SUPER_USERS[user_id]
+            save_authorized_users(SUPER_USERS)  # Update the storage
+            await event.respond("Your authorization has expired.")
+            return
+    
+    # Only authorized users can proceed
+    if user_id not in SUPER_USERS:
+        await event.respond("You are not authorized to use this command.")
+        return
+    # User is authorized; continue handling other commands
+
 
 @bot.on(events.NewMessage(incoming=True, pattern='/clean'))
 async def clear_all_delete_words_command_handler(event):
@@ -642,7 +717,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
             if msg.empty is not None:
                 await client.delete_messages(chat_id=sender, message_ids=edit_id)
                 return None            
-            if msg.media and msg.media == MessageMediaType.WEB_PAGE_PREVIEW:
+            if msg.media and msg.media == MessageMediaType.WEB_PAGE:
                 a = b = True
                 edit = await client.edit_message_text(sender, edit_id, "Cloning.")
                 if '--'  in msg.text.html or '**' in msg.text.html or '__' in msg.text.html or '~~' in msg.text.html or '||' in msg.text.html or '```' in msg.text.html or '`' in msg.text.html:
@@ -1000,7 +1075,7 @@ async def ggn_new(userbot, client, sender, edit_id, msg_link, i, file_n):
             if msg.empty is not None:
                 await client.delete_messages(chat_id=sender, message_ids=edit_id)
                 return None            
-            if msg.media and msg.media == MessageMediaType.WEB_PAGE_PREVIEW:
+            if msg.media and msg.media == MessageMediaType.WEB_PAGE:
                 a = b = True
                 edit = await client.edit_message_text(sender, edit_id, "Cloning.")
                 if '--'  in msg.text.html or '**' in msg.text.html or '__' in msg.text.html or '~~' in msg.text.html or '||' in msg.text.html or '```' in msg.text.html or '`' in msg.text.html:
