@@ -37,7 +37,7 @@ mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 db = mongo_client[DB_NAME]
 collection = db[COLLECTION_NAME]
 
-
+SUPER_USERS = {}
 
 def load_authorized_users():
     """
