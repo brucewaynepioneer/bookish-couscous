@@ -1,8 +1,6 @@
 
 #uwill
 import re
-import datetime
-import pytz
 import asyncio, time, os
 import pymongo
 from decouple import config
@@ -37,31 +35,23 @@ mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 db = mongo_client[DB_NAME]
 collection = db[COLLECTION_NAME]
 
-SUPER_USERS = {}
-
 def load_authorized_users():
     """
-    Load authorized user IDs from the MongoDB collection.
+    Load authorized user IDs from the MongoDB collection
     """
     authorized_users = set()
-    try:
-        for user_doc in collection.find({}, {"user_id": 1}):
-            if "user_id" in user_doc:
-                authorized_users.add(user_doc["user_id"])
-    except Exception as e:
-        print(f"Error loading authorized users: {e}")
+    for user_doc in collection.find():
+        if "user_id" in user_doc:
+            authorized_users.add(user_doc["user_id"])
     return authorized_users
 
 def save_authorized_users(authorized_users):
     """
-    Save authorized user IDs to the MongoDB collection.
+    Save authorized user IDs to the MongoDB collection
     """
-    try:
-        collection.delete_many({})
-        collection.insert_many([{"user_id": user_id} for user_id in authorized_users])
-    except Exception as e:
-        print(f"Error saving authorized users: {e}")
-
+    collection.delete_many({})
+    for user_id in authorized_users:
+        collection.insert_one({"user_id": user_id})
 
 def delete_all_users():
     """
@@ -323,7 +313,7 @@ async def replace_command(event):
 
 
 # Load existing authorizations on startup
-SUPER_USERS.update(load_authorized_users())
+SUPER_USERS = {}
 
 def parse_time_units(time_units):
     """
