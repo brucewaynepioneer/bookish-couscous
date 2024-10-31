@@ -1,4 +1,5 @@
 tgcrypto
+pytz
 numpy<2
 psutil
 pyrofork
