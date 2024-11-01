@@ -10,8 +10,6 @@ import requests
 import shutil
 import asyncio
 from decouple import config
-from datetime import datetime, timedelta
-from pymongo import MongoClient
 import re
 from .. import bot as gagan
 from .. import userbot, Bot, AUTH, SUDO_USERS, LOG_GROUP, MONGODB, OWNER_ID
@@ -91,91 +89,46 @@ ids_data = load_ids_data()
 chunk_tasks = {}
 
 
-
-
-
-
 @gagan.on(events.NewMessage(incoming=True, pattern='/auth'))
 async def _auth(event):
     """
-    Command to authorize multiple users for a limited time.
+    Command to authorize users
     """
+    # Check if the command is initiated by the owner
     if event.sender_id == OWNER_ID:
-        # Parse user IDs and duration from the command
+        # Parse the user ID from the command
         try:
-            command_parts = event.message.text.split()
-            user_ids = [int(uid) for uid in command_parts[1:-1]]
-            duration = command_parts[-1]
-
-            # Parse duration (e.g., 7d for 7 days)
-            duration_value = int(duration[:-1])
-            time_unit = duration[-1]
-
-            # Calculate expiration time based on the specified time unit
-            if time_unit == 'm':
-                expires_at = datetime.now() + timedelta(minutes=duration_value)
-                unit_name = "minutes"
-            elif time_unit == 'h':
-                expires_at = datetime.now() + timedelta(hours=duration_value)
-                unit_name = "hours"
-            elif time_unit == 'd':
-                expires_at = datetime.now() + timedelta(days=duration_value)
-                unit_name = "days"
-            elif time_unit == 'w':
-                expires_at = datetime.now() + timedelta(weeks=duration_value)
-                unit_name = "weeks"
-            else:
-                return await event.respond("Invalid time format. Use m, h, d, or w.")
-
+            user_id = int(event.message.text.split(' ')[1])
         except (ValueError, IndexError):
-            return await event.respond("Invalid /auth command. Use /auth USER_ID USER_ID ... DURATION (e.g., /auth 12345 67890 7d).")
+            return await event.respond("Invalid /auth command. Use /auth USER_ID.")
 
-        # Save each user with expiration time in MongoDB
-        newly_authorized = []
-        for user_id in user_ids:
-            if not collection.find_one({"user_id": user_id}):
-                collection.update_one(
-                    {"user_id": user_id},
-                    {"$set": {"expires_at": expires_at}},
-                    upsert=True
-                )
-                newly_authorized.append(user_id)
-
-        # Notify about authorization status
-        if newly_authorized:
-            duration_text = f"{duration_value} {unit_name}"
-            await event.respond(f"Users {', '.join(map(str, newly_authorized))} have been authorized for {duration_text}. Authorization expires at {expires_at}.")
-        else:
-            await event.respond("All specified users were already authorized.")
+        #Add the user ID to the authorized set
+        AUTHORIZED_USERS.add(user_id)
+        save_authorized_users(AUTHORIZED_USERS)
+        await event.respond(f"User {user_id} has been authorized.")
     else:
         await event.respond("You are not authorized to use this command.")
 
 @gagan.on(events.NewMessage(incoming=True, pattern='/unauth'))
 async def _unauth(event):
     """
-    Command to revoke authorization for multiple users.
+    Command to revoke authorization for users
     """
+    # Check if the command is initiated by the owner
     if event.sender_id == OWNER_ID:
-        # Parse user IDs from the command
+        # Parse the user ID from the command
         try:
-            user_ids = [int(uid) for uid in event.message.text.split()[1:]]
-            if not user_ids:
-                raise ValueError("No user IDs provided.")
+            user_id = int(event.message.text.split(' ')[1])
         except (ValueError, IndexError):
-            return await event.respond("Invalid /unauth command. Use /unauth USER_ID [USER_ID ...]")
+            return await event.respond("Invalid /unauth command. Use /unauth USER_ID.")
 
-        # Remove each user from MongoDB
-        revoked_users = []
-        for user_id in user_ids:
-            if collection.find_one({"user_id": user_id}):
-                collection.delete_one({"user_id": user_id})
-                revoked_users.append(user_id)
-
-        # Notify about revocation status
-        if revoked_users:
-            await event.respond(f"Authorization revoked for users {', '.join(map(str, revoked_users))}.")
+        # Remove the user ID from the authorized set
+        if user_id in AUTHORIZED_USERS:
+            AUTHORIZED_USERS.remove(user_id)
+            save_authorized_users(AUTHORIZED_USERS)
+            await event.respond(f"Authorization revoked for user {user_id}.")
         else:
-            await event.respond("None of the specified users were authorized.")
+            await event.respond(f"User {user_id} is not authorized.")
     else:
         await event.respond("You are not authorized to use this command.")
 
