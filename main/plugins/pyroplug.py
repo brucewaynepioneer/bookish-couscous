@@ -1,6 +1,8 @@
 
 #uwill
 import re
+from datetime import datetime, timedelta
+from pymongo import MongoClient
 import asyncio, time, os
 import pymongo
 from decouple import config
@@ -35,24 +37,30 @@ mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 db = mongo_client[DB_NAME]
 collection = db[COLLECTION_NAME]
 
-def load_authorized_users():
-    """
-    Load authorized user IDs from the MongoDB collection
-    """
-    authorized_users = set()
-    for user_doc in collection.find():
-        if "user_id" in user_doc:
-            authorized_users.add(user_doc["user_id"])
-    return authorized_users
-
-def save_authorized_users(authorized_users):
-    """
-    Save authorized user IDs to the MongoDB collection
-    """
-    collection.delete_many({})
-    for user_id in authorized_users:
-        collection.insert_one({"user_id": user_id})
-
+def load_authorized_users(): 
+    """ 
+    Load authorized user IDs and expiration times from MongoDB. 
+    """ 
+    authorized_users = {} 
+    current_time = datetime.now() 
+    for user_doc in collection.find(): 
+        if "user_id" in user_doc and "expires_at" in user_doc: 
+            expiration = user_doc["expires_at"] 
+            if expiration > current_time:  # Only load non-expired users 
+                authorized_users[user_doc["user_id"]] = expiration 
+            else: 
+                # Optionally: remove expired user documents from the collection 
+                collection.delete_one({"user_id": user_doc["user_id"]}) 
+    return authorized_users 
+ 
+def save_authorized_users(authorized_users): 
+    """ 
+    Save authorized user IDs with expiration times to MongoDB. 
+    """ 
+    collection.delete_many({})  # Clear existing records before saving new data 
+    for user_id, expires_at in authorized_users.items(): 
+        collection.insert_one({"user_id": user_id, "expires_at": expires_at})
+      
 SUPER_USERS = load_authorized_users()
 
 # Define a dictionary to store user chat IDs
@@ -297,43 +305,45 @@ async def replace_command(event):
     ##-----------------------------------------------##
     
     
-@bot.on(events.NewMessage(incoming=True, pattern='/auth'))
-async def _auth(event):
-    """
-    Command to authorize users
-    """
-    # Check if the command is initiated by the owner
-    if event.sender_id == OWNER_ID:
-        # Parse the user ID from the command
-        try:
-            user_id = int(event.message.text.split(' ')[1])
-        except (ValueError, IndexError):
-            return await event.respond("Invalid /auth command. Use /auth USER_ID.")
-
-        #Add the user ID to the authorized set
-        SUPER_USERS.add(user_id)
-        save_authorized_users(SUPER_USERS)
-        await event.respond(f"User {user_id} has been authorized for commands.")
-    else:
+@bot.on(events.NewMessage(incoming=True, pattern='/auth')) 
+async def _auth(event): 
+    """ 
+    Command to authorize users for a limited time. 
+    """ 
+    if event.sender_id == OWNER_ID: 
+        # Parse user ID and duration 
+        try: 
+            command_parts = event.message.text.split() 
+            user_id = int(command_parts[1]) 
+             
+            # Parse the duration (e.g., 30d for 30 days) 
+            duration_value = int(command_parts[2][:-1]) 
+            time_unit = command_parts[2][-1] 
+ 
+            # Calculate expiration time based on time unit 
+            if time_unit == 'm':  # minutes 
+                expires_at = datetime.now() + timedelta(minutes=duration_value) 
+            elif time_unit == 'h':  # hours 
+                expires_at = datetime.now() + timedelta(hours=duration_value) 
+            elif time_unit == 'd':  # days 
+                expires_at = datetime.now() + timedelta(days=duration_value) 
+            elif time_unit == 'w':  # weeks 
+                expires_at = datetime.now() + timedelta(weeks=duration_value) 
+            else: 
+                return await event.respond("Invalid time format. Use m, h, d, or w for minutes, hours, days, or weeks.") 
+             
+        except (ValueError, IndexError): 
+            return await event.respond("Invalid /auth command. Use /auth USER_ID DURATION (e.g., /auth 12345 30d).") 
+ 
+        # Save to MongoDB 
+        collection.update_one( 
+            {"user_id": user_id}, 
+            {"$set": {"expires_at": expires_at}}, 
+            upsert=True 
+        ) 
+        await event.respond(f"User {user_id} has been authorized for {duration_value}{time_unit}.") 
+    else: 
         await event.respond("You are not authorized to use this command.")
-
-@bot.on(events.NewMessage(incoming=True, pattern='/clean'))
-async def clear_all_delete_words_command_handler(event):
-    """
-    Command to clear all saved delete words for all users
-    """
-    # Check if the command is used by the owner
-    if event.sender_id != OWNER_ID:
-        return await event.respond("You are not authorized to use this command!")
-    
-    try:
-        # Clear all delete words from the database
-        collection.delete_many({})
-        await event.respond("All saved delete words have been cleared for all users.")
-    except Exception as e:
-        print(f"Error clearing all delete words: {e}")
-        await event.respond("An error occurred while clearing all delete words.")
-
 
 @bot.on(events.NewMessage(incoming=True, pattern='/delete'))
 async def delete_word_command_handler(event):
