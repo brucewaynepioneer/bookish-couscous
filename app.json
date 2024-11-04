@@ -1,15 +1,16 @@
 {
-    "name": "Save restricted content bot by @devggn",
-    "description": "Telegram bot to save restricted content.",
+    "name": "Bookish Couscous Bot",
+    "description": "Telegram bot to get restricted messages with custom thumbnail support.",
     "logo": "https://lh3.googleusercontent.com/-HPcn7AqepNg/AAAAAAAAAAI/AAAAAAAAAAA/ALKGfknb1BkQiq-8_KUVOYcNAJ4swKivDQ/photo.jpg",
     "keywords": [
         "telegram",
-        "Save restricted content",
-        "bot"
+        "restricted content",
+        "bot",
+        "custom thumbnail"
     ],
-    "repository": "https://github.com/devgaganin/save_restricted-content-telegram-bot-repo",
+    "repository": "https://github.com/brucewaynepioneer/bookish-couscous",
     "website": "",
-    "success_url": "https://devgagan.in",
+    "success_url": "https://t.me/advance_content_saver_bot",
     "env": {
         "API_HASH": {
             "description": "Your API HASH from my.telegram.org",
@@ -37,22 +38,22 @@
             "required": true
         },
         "FORCESUB": {
-            "description": "Username name of public channel without using '@'.",
+            "description": "Username of public channel without '@'.",
             "value": "",
             "required": true
         },
         "MONGODB": {
-            "description": "Enter your own MongoDB URI.",
+            "description": "MongoDB URI if applicable.",
             "value": "",
             "required": false
         },
         "OWNER_ID": {
-            "description": "Your Telegram ID",
+            "description": "Your Telegram ID.",
             "value": "",
             "required": true
         },
         "LOG_GROUP": {
-            "description": "Enter log group ID with -100",
+            "description": "Log group ID prefixed with -100.",
             "value": "",
             "required": true
         }
