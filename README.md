@@ -90,10 +90,8 @@ python3 -m main
 
 ## Deploy your bot on `heroku`
 
-» Method - 1:
-- Star the repo, and fork it in desktop mode
-- Click on  [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
-- Fill your values and done ✅
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/brucewaynepioneer/bookish-couscous)
+
  
 » Method - 2:
 - Star the repo, rate and fork it in desktop mode
